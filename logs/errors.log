@@ -1,0 +1,8 @@
+2025-05-26 14:21:13,012 ERROR [user-service] - Failed to connect to database: Connection timed out
+2025-05-26 14:22:45,453 WARN  [auth-service] - Token expired for user ID 4321
+2025-05-26 14:23:17,783 ERROR [payment-service] - Payment processing failed: Invalid credit card number
+2025-05-26 14:24:29,990 ERROR [order-service] - NullPointerException at OrderProcessor.java:67
+2025-05-26 14:25:38,003 WARN  [api-gateway] - Slow response time detected: 4231ms
+2025-05-26 14:27:42,341 ERROR [inventory-service] - Inventory mismatch for product ID 1012
+2025-05-26 14:28:55,120 ERROR [user-service] - Unauthorized access attempt detected from IP 192.168.1.104
+2025-05-26 14:29:30,932 ERROR [scheduler] - Job failed: "DataSyncJob", Reason: TimeoutException

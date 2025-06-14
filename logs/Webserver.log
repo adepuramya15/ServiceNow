@@ -1,0 +1,2 @@
+[Mon May 26 14:31:53.987654 2025] [php7:error] [pid 12345] [client 192.168.1.99:58922] PHP Fatal error: Uncaught Error: Call to undefined function
+[Mon May 26 14:32:23.462013 2025] [core:error] [pid 12347] [client 192.168.1.88:51123] AH00558: apache2: Could not reliably determine the server's fully qualified domain name

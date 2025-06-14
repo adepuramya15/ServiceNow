@@ -1,0 +1,10 @@
+2025-05-26 15:02:10,451 ERROR [auth-service] - Login failed: Incorrect password for user admin
+2025-05-26 15:03:25,112 ERROR [report-generator] - Failed to generate report: FileNotFoundException at ReportEngine.java:112
+2025-05-26 15:04:47,822 WARN  [cache-manager] - Cache miss for key session:abc123
+2025-05-26 15:05:33,899 ERROR [email-service] - SMTPConnectionException: Unable to connect to smtp.example.com
+2025-05-26 15:06:44,731 ERROR [webhook-handler] - Malformed payload received from partner API
+2025-05-26 15:07:51,445 WARN  [user-service] - Deprecated API used: /v1/getUserDetails
+2025-05-26 15:09:02,113 ERROR [billing-service] - Database error: Deadlock found when trying to get lock; try restarting transaction
+2025-05-26 15:10:16,999 ERROR [notification-service] - Push notification failed: Invalid device token
+2025-05-26 15:11:33,771 WARN  [kafka-consumer] - Partition lag exceeds threshold for topic "user-events"
+2025-05-26 15:12:45,663 ERROR [payment-service] - Payment declined by issuer: Insufficient funds
