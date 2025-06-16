@@ -27,7 +27,7 @@ SN_INSTANCE="dev299595.service-now.com"
 SN_USER="admin"
 SN_PASS="iRN-lr6!5EnR"
 LOG_FILE="./change_request.log"
-ASSIGNMENT_GROUP="8a4dde73c6112278017a6a4baf547aa7"
+ASSIGNMENT_GROUP="Software"
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
