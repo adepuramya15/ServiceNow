@@ -1,21 +1,33 @@
 #!/bin/bash
 
-# === STEP 1: Ask user to proceed ===
-while true; do
-  read -p "Do you want to raise a Change Request? (yes/no): " USER_INPUT
-  case "$USER_INPUT" in
-    yes ) break ;;
-    no ) echo "❌ Change Request creation aborted by user."; exit 0 ;;
-    * ) echo "Please answer yes or no." ;;
+# === STEP 1: User Menu and Reason Input ===
+echo "Choose an action:"
+select choice in "Raise Change Request" "Exit"; do
+  case $REPLY in
+    1)
+      read -p "Enter reason for raising the Change Request: " REASON
+      if [ -z "$REASON" ]; then
+        echo "❌ Reason is required to proceed."
+        exit 1
+      fi
+      break
+      ;;
+    2)
+      echo "❌ Change Request creation aborted by user."
+      exit 0
+      ;;
+    *)
+      echo "Invalid option. Please choose 1 or 2."
+      ;;
   esac
 done
 
 # === STEP 2: Variables ===
-SN_INSTANCE="dev214721.service-now.com"
+SN_INSTANCE="https://dev299595.service-now.com"
 SN_USER="admin"
-SN_PASS="+zL%FlUb87Un"
+SN_PASS="iRN-lr6!5EnR"
 LOG_FILE="./change_request.log"
-ASSIGNMENT_GROUP="287ebd7da9fe198100f92cc8d1d2154e"
+ASSIGNMENT_GROUP="8a4dde73c6112278017a6a4baf547aa7"
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
@@ -26,7 +38,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   -H "Content-Type: application/json" \
   -d "{
         \"short_description\": \"Automated Change Request from Harness CI Pipeline\",
-        \"description\": \"Triggered by deployment pipeline.\",
+        \"description\": \"$REASON\",
         \"category\": \"Software\",
         \"priority\": \"3\",
         \"assignment_group\": \"$ASSIGNMENT_GROUP\",
@@ -35,7 +47,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
 
 echo "Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
 
-# === STEP 4: Extract sys_id and change number ===
+# === STEP 4: Extract sys_id and number ===
 CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/"sys_id":"//')
 CHANGE_REQUEST_NUMBER=$(echo "$CREATE_RESPONSE" | grep -o '"number":"[^"]*' | sed 's/"number":"//')
 
