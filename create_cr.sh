@@ -23,7 +23,7 @@ select choice in "Raise Change Request" "Exit"; do
 done
 
 # === STEP 2: Variables ===
-SN_INSTANCE="https://dev299595.service-now.com"
+SN_INSTANCE="dev299595.service-now.com"
 SN_USER="admin"
 SN_PASS="iRN-lr6!5EnR"
 LOG_FILE="./change_request.log"
