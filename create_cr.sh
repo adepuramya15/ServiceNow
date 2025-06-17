@@ -1,26 +1,11 @@
 #!/bin/bash
 
-# === STEP 1: User Menu and Reason Input ===
-echo "Choose an action:"
-select choice in "Raise Change Request" "Exit"; do
-  case $REPLY in
-    1)
-      read -p "Enter reason for raising the Change Request: " REASON
-      if [ -z "$REASON" ]; then
-        echo "❌ Reason is required to proceed."
-        exit 1
-      fi
-      break
-      ;;
-    2)
-      echo "❌ Change Request creation aborted by user."
-      exit 0
-      ;;
-    *)
-      echo "Invalid option. Please choose 1 or 2."
-      ;;
-  esac
-done
+# === STEP 1: Reason Input Only ===
+read -p "Enter reason for raising the Change Request: " REASON
+if [ -z "$REASON" ]; then
+  echo "❌ Reason is required to proceed."
+  exit 1
+fi
 
 # === STEP 2: Variables ===
 SN_INSTANCE="dev299595.service-now.com"
