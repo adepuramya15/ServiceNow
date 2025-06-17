@@ -1,22 +1,16 @@
 #!/bin/bash
 
-# === STEP 1: Reason Input Only ===
-read -p "Enter reason for raising the Change Request: " REASON
-if [ -z "$REASON" ]; then
-  echo "❌ Reason is required to proceed."
-  exit 1
-fi
-
-# === STEP 2: Variables ===
+# === STEP 1: Variables ===
 SN_INSTANCE="dev299595.service-now.com"
 SN_USER="admin"
 SN_PASS="iRN-lr6!5EnR"
 LOG_FILE="./change_request.log"
 ASSIGNMENT_GROUP="Software"
+REASON="Automated change request triggered from Harness CI/CD pipeline."
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
-# === STEP 3: Create Change Request ===
+# === STEP 2: Create Change Request ===
 CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   "https://$SN_INSTANCE/api/now/table/change_request" \
   -u "$SN_USER:$SN_PASS" \
@@ -32,7 +26,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
 
 echo "Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
 
-# === STEP 4: Extract sys_id and number ===
+# === STEP 3: Extract sys_id and number ===
 CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/"sys_id":"//')
 CHANGE_REQUEST_NUMBER=$(echo "$CREATE_RESPONSE" | grep -o '"number":"[^"]*' | sed 's/"number":"//')
 
@@ -44,7 +38,7 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 5: Poll for Implement state ===
+# === STEP 4: Poll for Implement state ===
 echo "⏳ Waiting for Change Request to enter 'Implement' state..." | tee -a "$LOG_FILE"
 
 MAX_RETRIES=30
