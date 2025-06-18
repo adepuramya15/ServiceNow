@@ -11,7 +11,8 @@ ASSIGNMENT_GROUP="Software"
 REASON="Automated change request for Splunk log integration using Harness CI/CD pipeline."
 REQUESTED_BY="David Loo"  # Use sys_id if needed
 CATEGORY="Software"
-SERVICE="Splunk Integration"
+SERVICE="Splunk"
+SERVICE_OFFERING="Splunk Log Analytics"
 CONFIG_ITEM="Splunk Logging"
 PRIORITY="3"
 RISK="2"       # 1-Low, 2-Moderate, 3-High
@@ -40,6 +41,8 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"impact\": \"$IMPACT\",
         \"assignment_group\": \"$ASSIGNMENT_GROUP\",
         \"cmdb_ci\": \"$CONFIG_ITEM\",
+        \"service\": \"$SERVICE\",
+        \"service_offering\": \"$SERVICE_OFFERING\",
         \"justification\": \"$JUSTIFICATION\",
         \"implementation_plan\": \"$IMPLEMENTATION_PLAN\",
         \"risk_and_impact_analysis\": \"$RISK_ANALYSIS\",
