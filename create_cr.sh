@@ -38,30 +38,34 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Poll for Implement state ===
-echo "⏳ Waiting for Change Request to enter 'Implement' state..." | tee -a "$LOG_FILE"
+# === STEP 4: Poll for Implement or Rejected state ===
+echo "⏳ Waiting for Change Request to be Approved and enter 'Implement' state..." | tee -a "$LOG_FILE"
 
 MAX_RETRIES=30
 SLEEP_INTERVAL=30
 COUNT=0
 LAST_STATE=""
+LAST_APPROVAL=""
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
     "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID")
 
+  # Extract state and approval status
   CHANGE_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
+  APPROVAL_STATUS=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
 
-  if [[ "$CHANGE_STATE" != "$LAST_STATE" ]]; then
-    echo "[$(date)] Change Request State: $CHANGE_STATE" | tee -a "$LOG_FILE"
+  if [[ "$CHANGE_STATE" != "$LAST_STATE" || "$APPROVAL_STATUS" != "$LAST_APPROVAL" ]]; then
+    echo "[$(date)] State: $CHANGE_STATE | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
     LAST_STATE=$CHANGE_STATE
+    LAST_APPROVAL=$APPROVAL_STATUS
   fi
 
-  if [[ "$CHANGE_STATE" == "-1" ]]; then
-    echo "✅ Change Request is in 'Implement' state. Continuing pipeline..." | tee -a "$LOG_FILE"
+  if [[ "$CHANGE_STATE" == "-1" || "$APPROVAL_STATUS" == "approved" ]]; then
+    echo "✅ Change Request is approved and in 'Implement' state. Continuing pipeline..." | tee -a "$LOG_FILE"
     exit 0
-  elif [[ "$CHANGE_STATE" == "8" ]]; then  # 8 is usually Rejected state
-    echo "❌ Change Request was Rejected. Stopping pipeline." | tee -a "$LOG_FILE"
+  elif [[ "$APPROVAL_STATUS" == "rejected" || "$CHANGE_STATE" == "8" ]]; then
+    echo "❌ Change Request was Rejected. Aborting pipeline." | tee -a "$LOG_FILE"
     exit 1
   fi
 
@@ -70,5 +74,5 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   sleep $SLEEP_INTERVAL
 done
 
-echo "❌ Timeout waiting for 'Implement' state." | tee -a "$LOG_FILE"
+echo "❌ Timeout waiting for 'Implement' state or approval." | tee -a "$LOG_FILE"
 exit 1
