@@ -9,14 +9,14 @@ LOG_FILE="./change_request.log"
 # === Change Request Fields ===
 ASSIGNMENT_GROUP="Software"
 REASON="Automated change request for Splunk log integration using Harness CI/CD pipeline."
-REQUESTED_BY="David Loo"  # Use sys_id if needed
+REQUESTED_BY="David Loo"
 CATEGORY="Software"
 BUSINESS_SERVICE="Splunk Platform"
 SERVICE_OFFERING="Log Ingestion & Monitoring"
 CONFIG_ITEM="Splunk Forwarder Node"
 PRIORITY="3"
-RISK="2"       # 1-Low, 2-Moderate, 3-High
-IMPACT="2"     # 1-High, 2-Moderate, 3-Low
+RISK="2"
+IMPACT="2"
 
 # === Planning Fields ===
 JUSTIFICATION="Integrating Splunk logging into Harness CI/CD pipeline for enhanced monitoring and automated event visibility."
@@ -24,6 +24,16 @@ IMPLEMENTATION_PLAN="1. Configure Splunk HEC endpoint\n2. Push logs from Harness
 RISK_AND_IMPACT_ANALYSIS="Risk is minimal. If Splunk fails to receive logs, fallback logging remains active on Jenkins and Harness. No disruption expected."
 BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the pipeline."
 TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
+
+# === Scheduling Fields ===
+PLANNED_START_DATE="2025-06-20 09:00:00"
+PLANNED_END_DATE="2025-06-20 10:30:00"
+CAB_REQUIRED="true"
+CAB_DATE="2025-06-19 15:00:00"
+ACTUAL_START_DATE=""
+ACTUAL_END_DATE=""
+CAB_DELEGATE="Change Advisory Board"
+CAB_RECOMMENDATION="Approved - Proceed with minimal risk"
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
@@ -48,6 +58,14 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"risk_and_impact_analysis\": \"$RISK_AND_IMPACT_ANALYSIS\",
         \"backout_plan\": \"$BACKOUT_PLAN\",
         \"test_plan\": \"$TEST_PLAN\",
+        \"start_date\": \"$PLANNED_START_DATE\",
+        \"end_date\": \"$PLANNED_END_DATE\",
+        \"cab_required\": \"$CAB_REQUIRED\",
+        \"cab_date\": \"$CAB_DATE\",
+        \"work_start\": \"$ACTUAL_START_DATE\",
+        \"work_end\": \"$ACTUAL_END_DATE\",
+        \"cab_delegate\": \"$CAB_DELEGATE\",
+        \"cab_recommendation\": \"$CAB_RECOMMENDATION\",
         \"state\": \"Assess\"
       }")
 
