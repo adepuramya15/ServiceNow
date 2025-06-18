@@ -60,6 +60,9 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   if [[ "$CHANGE_STATE" == "-1" ]]; then
     echo "✅ Change Request is in 'Implement' state. Continuing pipeline..." | tee -a "$LOG_FILE"
     exit 0
+  elif [[ "$CHANGE_STATE" == "8" ]]; then  # 8 is usually Rejected state
+    echo "❌ Change Request was Rejected. Stopping pipeline." | tee -a "$LOG_FILE"
+    exit 1
   fi
 
   COUNT=$((COUNT+1))
