@@ -18,12 +18,12 @@ PRIORITY="3"
 RISK="2"       # 1-Low, 2-Moderate, 3-High
 IMPACT="2"     # 1-High, 2-Moderate, 3-Low
 
-# === Planning Fields (customized for Splunk + Harness) ===
+# === Planning Fields ===
 JUSTIFICATION="Integrating Splunk logging into Harness CI/CD pipeline for enhanced monitoring and automated event visibility."
 IMPLEMENTATION_PLAN="1. Configure Splunk HEC endpoint\n2. Push logs from Harness CI pipeline\n3. Validate log ingestion\n4. Monitor dashboards and alerts"
-RISK_ANALYSIS="There is minimal risk. If Splunk fails to receive logs, fallback logging is available locally. No impact to production flow."
-BACKOUT_PLAN="Disable Splunk log stages in Harness pipeline and revert to previous logging method."
-TEST_PLAN="Simulate pipeline execution and verify logs appear in Splunk index. QA will validate expected events are ingested and searchable."
+RISK_AND_IMPACT_ANALYSIS="Risk is minimal. If Splunk fails to receive logs, fallback logging remains active on Jenkins and Harness. No disruption expected."
+BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the pipeline."
+TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
@@ -45,7 +45,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"service_offering\": \"$SERVICE_OFFERING\",
         \"justification\": \"$JUSTIFICATION\",
         \"implementation_plan\": \"$IMPLEMENTATION_PLAN\",
-        \"risk_and_impact_analysis\": \"$RISK_ANALYSIS\",
+        \"risk_and_impact_analysis\": \"$RISK_AND_IMPACT_ANALYSIS\",
         \"backout_plan\": \"$BACKOUT_PLAN\",
         \"test_plan\": \"$TEST_PLAN\",
         \"state\": \"Assess\"
