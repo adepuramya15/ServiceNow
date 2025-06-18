@@ -5,8 +5,24 @@ SN_INSTANCE="dev299595.service-now.com"
 SN_USER="admin"
 SN_PASS="iRN-lr6!5EnR"
 LOG_FILE="./change_request.log"
+
+# === Change Request Fields ===
 ASSIGNMENT_GROUP="Software"
 REASON="Automated change request triggered from Harness CI/CD pipeline."
+REQUESTED_BY="David Loo"  # Use sys_id if required
+CATEGORY="Software"
+SERVICE="Sales Force Automation"
+CONFIG_ITEM="Sales Force Automation"
+PRIORITY="3"
+RISK="3"       # 1-Low, 2-Moderate, 3-High (ServiceNow uses numeric values)
+IMPACT="2"     # 1-High, 2-Moderate, 3-Low
+
+# === Planning Fields ===
+JUSTIFICATION="This change is necessary for maintaining production stability and enabling new features."
+IMPLEMENTATION_PLAN="1. Snapshot current environment via VmWare\n2. Deploy new version using Harness CI/CD\n3. Monitor post-deploy health checks"
+RISK_ANALYSIS="Potential risk is minimal due to rollback plan. However, any deployment failure may cause short downtime."
+BACKOUT_PLAN="Restore VmWare snapshot taken before deployment."
+TEST_PLAN="Automated test cases will run post-deployment. QA team will validate critical paths."
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
@@ -18,9 +34,17 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   -d "{
         \"short_description\": \"Automated Change Request from Harness CI Pipeline\",
         \"description\": \"$REASON\",
-        \"category\": \"Software\",
-        \"priority\": \"3\",
+        \"category\": \"$CATEGORY\",
+        \"priority\": \"$PRIORITY\",
+        \"risk\": \"$RISK\",
+        \"impact\": \"$IMPACT\",
         \"assignment_group\": \"$ASSIGNMENT_GROUP\",
+        \"cmdb_ci\": \"$CONFIG_ITEM\",
+        \"justification\": \"$JUSTIFICATION\",
+        \"implementation_plan\": \"$IMPLEMENTATION_PLAN\",
+        \"risk_and_impact_analysis\": \"$RISK_ANALYSIS\",
+        \"backout_plan\": \"$BACKOUT_PLAN\",
+        \"test_plan\": \"$TEST_PLAN\",
         \"state\": \"Assess\"
       }")
 
