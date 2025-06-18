@@ -8,21 +8,21 @@ LOG_FILE="./change_request.log"
 
 # === Change Request Fields ===
 ASSIGNMENT_GROUP="Software"
-REASON="Automated change request triggered from Harness CI/CD pipeline."
-REQUESTED_BY="David Loo"  # Use sys_id if required
+REASON="Automated change request for Splunk log integration using Harness CI/CD pipeline."
+REQUESTED_BY="David Loo"  # Use sys_id if needed
 CATEGORY="Software"
-SERVICE="Sales Force Automation"
-CONFIG_ITEM="Sales Force Automation"
+SERVICE="Splunk Integration"
+CONFIG_ITEM="Splunk Logging"
 PRIORITY="3"
-RISK="3"       # 1-Low, 2-Moderate, 3-High (ServiceNow uses numeric values)
+RISK="2"       # 1-Low, 2-Moderate, 3-High
 IMPACT="2"     # 1-High, 2-Moderate, 3-Low
 
-# === Planning Fields ===
-JUSTIFICATION="This change is necessary for maintaining production stability and enabling new features."
-IMPLEMENTATION_PLAN="1. Snapshot current environment via VmWare\n2. Deploy new version using Harness CI/CD\n3. Monitor post-deploy health checks"
-RISK_ANALYSIS="Potential risk is minimal due to rollback plan. However, any deployment failure may cause short downtime."
-BACKOUT_PLAN="Restore VmWare snapshot taken before deployment."
-TEST_PLAN="Automated test cases will run post-deployment. QA team will validate critical paths."
+# === Planning Fields (customized for Splunk + Harness) ===
+JUSTIFICATION="Integrating Splunk logging into Harness CI/CD pipeline for enhanced monitoring and automated event visibility."
+IMPLEMENTATION_PLAN="1. Configure Splunk HEC endpoint\n2. Push logs from Harness CI pipeline\n3. Validate log ingestion\n4. Monitor dashboards and alerts"
+RISK_ANALYSIS="There is minimal risk. If Splunk fails to receive logs, fallback logging is available locally. No impact to production flow."
+BACKOUT_PLAN="Disable Splunk log stages in Harness pipeline and revert to previous logging method."
+TEST_PLAN="Simulate pipeline execution and verify logs appear in Splunk index. QA will validate expected events are ingested and searchable."
 
 echo "Creating change request..." | tee "$LOG_FILE"
 
@@ -32,7 +32,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   -u "$SN_USER:$SN_PASS" \
   -H "Content-Type: application/json" \
   -d "{
-        \"short_description\": \"Automated Change Request from Harness CI Pipeline\",
+        \"short_description\": \"Splunk Log Integration via Harness Pipeline\",
         \"description\": \"$REASON\",
         \"category\": \"$CATEGORY\",
         \"priority\": \"$PRIORITY\",
