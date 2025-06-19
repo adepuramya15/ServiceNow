@@ -92,6 +92,10 @@ COUNT=0
 STAGE_PASSED=""
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
+  # Print current UTC time for scheduling
+  CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
+  echo "🕒 Current UTC Time: $CURRENT_UTC" | tee -a "$LOG_FILE"
+
   RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
     "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID")
 
@@ -106,9 +110,6 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
     "Authorize")
       if [[ "$STAGE_PASSED" != *"Authorize"* ]]; then
         echo "🔐 Moved to Authorize | Approval: $APPROVAL" | tee -a "$LOG_FILE"
-        UTC_NOW=$(date -u +"%Y-%m-%d %H:%M:%S")
-        echo "🌐 Current UTC Time: $UTC_NOW" | tee -a "$LOG_FILE"
-        echo "👉 Use this UTC time as the Scheduled Start Date in ServiceNow to proceed immediately." | tee -a "$LOG_FILE"
         STAGE_PASSED+="Authorize "
       fi
       ;;
@@ -147,6 +148,3 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   echo "Retrying in $SLEEP_INTERVAL seconds... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
   sleep $SLEEP_INTERVAL
 done
-
-echo "❌ Timeout: Implement stage was not reached in time." | tee -a "$LOG_FILE"
-exit 1
