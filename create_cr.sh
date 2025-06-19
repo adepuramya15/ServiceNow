@@ -83,41 +83,62 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Poll for Implement or Rejected state ===
-echo "⏳ Waiting for Change Request to be Approved and enter 'Implement' state..." | tee -a "$LOG_FILE"
+# === STEP 4: Monitor Stage by Stage ===
+echo "⏳ Tracking Change Request state: Assess → Authorize → Scheduled → Implement..." | tee -a "$LOG_FILE"
 
-MAX_RETRIES=30
+MAX_RETRIES=60
 SLEEP_INTERVAL=30
 COUNT=0
-LAST_STATE=""
-LAST_APPROVAL=""
+SCHEDULED_WAIT_DONE=false
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
     "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID")
 
-  # Extract state and approval status
   CHANGE_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
   APPROVAL_STATUS=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
+  START_DATE=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
 
-  if [[ "$CHANGE_STATE" != "$LAST_STATE" || "$APPROVAL_STATUS" != "$LAST_APPROVAL" ]]; then
-    echo "[$(date)] State: $CHANGE_STATE | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
-    LAST_STATE=$CHANGE_STATE
-    LAST_APPROVAL=$APPROVAL_STATUS
-  fi
-
-  if [[ "$CHANGE_STATE" == "-1" || "$APPROVAL_STATUS" == "approved" ]]; then
-    echo "✅ Change Request is approved and in 'Implement' state. Continuing pipeline..." | tee -a "$LOG_FILE"
-    exit 0
-  elif [[ "$APPROVAL_STATUS" == "rejected" || "$CHANGE_STATE" == "8" ]]; then
-    echo "❌ Change Request was Rejected. Aborting pipeline." | tee -a "$LOG_FILE"
-    exit 1
-  fi
+  case "$CHANGE_STATE" in
+    "Assess")
+      echo "📝 Stage: Assess | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
+      ;;
+    "Authorize")
+      echo "🔐 Stage: Authorize | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
+      ;;
+    "Scheduled")
+      echo "📅 Stage: Scheduled | Waiting for start time: $START_DATE" | tee -a "$LOG_FILE"
+      if [ "$SCHEDULED_WAIT_DONE" = false ]; then
+        CURRENT_EPOCH=$(date +%s)
+        START_EPOCH=$(date -d "$START_DATE" +%s)
+        SECONDS_TO_WAIT=$(( START_EPOCH - CURRENT_EPOCH ))
+        if (( SECONDS_TO_WAIT > 0 )); then
+          echo "🕒 Sleeping $SECONDS_TO_WAIT seconds until scheduled start time..." | tee -a "$LOG_FILE"
+          sleep $SECONDS_TO_WAIT
+        else
+          echo "⏩ Scheduled time already passed. Continuing..." | tee -a "$LOG_FILE"
+        fi
+        SCHEDULED_WAIT_DONE=true
+      fi
+      ;;
+    "Implement")
+      echo "🚀 Stage: Implement | Execution started." | tee -a "$LOG_FILE"
+      echo "✅ Reached final stage (Implement). Exiting successfully." | tee -a "$LOG_FILE"
+      exit 0
+      ;;
+    "Closed" | "Cancelled")
+      echo "❌ Request ended in '$CHANGE_STATE' state. Exiting." | tee -a "$LOG_FILE"
+      exit 1
+      ;;
+    *)
+      echo "🔄 Current Stage: $CHANGE_STATE | Waiting..." | tee -a "$LOG_FILE"
+      ;;
+  esac
 
   COUNT=$((COUNT+1))
-  echo "Waiting... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
+  echo "Sleeping $SLEEP_INTERVAL seconds... Retry ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
   sleep $SLEEP_INTERVAL
 done
 
-echo "❌ Timeout waiting for 'Implement' state or approval." | tee -a "$LOG_FILE"
+echo "❌ Timeout: Did not reach 'Implement' stage within expected time." | tee -a "$LOG_FILE"
 exit 1
