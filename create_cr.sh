@@ -26,9 +26,9 @@ BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the
 TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
 
 # === Scheduling Fields (static date/time) ===
-PLANNED_START_DATE="2025-06-19 12:18:00"
-PLANNED_END_DATE="2025-06-19 13:48:00"
-CAB_DATE="2025-06-19 13:18:00"
+PLANNED_START_DATE=""
+PLANNED_END_DATE=""
+CAB_DATE=""
 ACTUAL_START_DATE=""
 ACTUAL_END_DATE=""
 CAB_REQUIRED="true"
