@@ -25,7 +25,7 @@ RISK_AND_IMPACT_ANALYSIS="Risk is minimal. If Splunk fails to receive logs, fall
 BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the pipeline."
 TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
 
-# === Scheduling Fields (static date/time) ===
+# === Scheduling Fields ===
 PLANNED_START_DATE=""
 PLANNED_END_DATE=""
 CAB_DATE=""
@@ -46,7 +46,7 @@ declare -A STATE_MAP=(
   ["4"]="Cancelled"
 )
 
-echo "Creating change request..." | tee "$LOG_FILE"
+echo "📦 Creating change request..." | tee "$LOG_FILE"
 
 # === STEP 2: Create Change Request ===
 CREATE_RESPONSE=$(curl --silent --show-error -X POST \
@@ -80,7 +80,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"state\": \"Assess\"
       }")
 
-echo "Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
+echo "📨 Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
 
 # === STEP 3: Extract sys_id and number ===
 CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/"sys_id":"//')
@@ -94,16 +94,16 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Each Stage ===
-echo "⏳ Waiting for stage transitions: Assess → Authorize → Scheduled → Implement" | tee -a "$LOG_FILE"
+# === STEP 4: Monitor Stages ===
+echo "🔍 Monitoring Change Request progression..." | tee -a "$LOG_FILE"
 
 MAX_RETRIES=120
 SLEEP_INTERVAL=30
 COUNT=0
 SCHEDULED_LOGGED=false
+IMPLEMENT_REACHED=false
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
-  # Show UTC time to guide scheduling
   CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
   echo "🕒 Current UTC Time: $CURRENT_UTC" | tee -a "$LOG_FILE"
 
@@ -115,26 +115,31 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
   START_DATE=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
 
-  echo "🔄 Current Stage: $STATE_NAME | Approval: $APPROVAL | Waiting..." | tee -a "$LOG_FILE"
+  echo "🔄 Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
   if [[ "$STATE_NAME" == "Scheduled" && "$SCHEDULED_LOGGED" == false ]]; then
     echo "📅 Deployment time set in ServiceNow: $START_DATE" | tee -a "$LOG_FILE"
     SCHEDULED_LOGGED=true
   fi
 
-  if [[ "$STATE_NAME" == "Implement" ]]; then
-    echo "🚀 Reached Implement Stage | Start deploying to Splunk..." | tee -a "$LOG_FILE"
-    echo "✅ Final stage reached. Exiting successfully." | tee -a "$LOG_FILE"
+  if [[ "$STATE_NAME" == "Implement" && "$IMPLEMENT_REACHED" == false ]]; then
+    echo "🚀 Reached Implement stage – triggering deployment now." | tee -a "$LOG_FILE"
+    IMPLEMENT_REACHED=true
+    # Wait a few seconds to confirm it doesn’t revert or delay
+    sleep 5
+    echo "✅ Deployment confirmed. Exiting successfully." | tee -a "$LOG_FILE"
     exit 0
-  elif [[ "$STATE_NAME" == "Closed" || "$STATE_NAME" == "Cancelled" ]]; then
+  fi
+
+  if [[ "$STATE_NAME" == "Closed" || "$STATE_NAME" == "Cancelled" ]]; then
     echo "❌ Request ended in '$STATE_NAME' state. Aborting." | tee -a "$LOG_FILE"
     exit 1
   fi
 
   COUNT=$((COUNT + 1))
-  echo "Retrying in $SLEEP_INTERVAL seconds... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
+  echo "⏳ Retrying in $SLEEP_INTERVAL seconds... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
   sleep $SLEEP_INTERVAL
 done
 
-echo "❌ Timeout: Implement stage was not reached in time." | tee -a "$LOG_FILE"
+echo "❌ Timeout: Implement stage was not reached within time." | tee -a "$LOG_FILE"
 exit 1
