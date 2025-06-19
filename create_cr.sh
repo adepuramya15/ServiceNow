@@ -25,7 +25,7 @@ RISK_AND_IMPACT_ANALYSIS="Risk is minimal. If Splunk fails to receive logs, fall
 BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the pipeline."
 TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
 
-# === Scheduling Fields (static date/time) ===
+# === Scheduling Fields ===
 PLANNED_START_DATE="2025-06-19 12:18:00"
 PLANNED_END_DATE="2025-06-19 13:48:00"
 CAB_DATE="2025-06-19 13:18:00"
@@ -86,8 +86,8 @@ echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 # === STEP 4: Monitor Each Stage ===
 echo "⏳ Waiting for stage transitions: Assess → Authorize → Scheduled → Implement" | tee -a "$LOG_FILE"
 
-MAX_RETRIES=120
-SLEEP_INTERVAL=30
+MAX_RETRIES=40
+SLEEP_INTERVAL=10
 COUNT=0
 STAGE_PASSED=""
 
@@ -116,7 +116,11 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
         CURRENT_EPOCH=$(date +%s)
         START_EPOCH=$(date -d "$START_DATE" +%s)
         WAIT_TIME=$((START_EPOCH - CURRENT_EPOCH))
-        if (( WAIT_TIME > 0 )); then
+
+        if (( WAIT_TIME > 120 )); then
+          echo "⚠️ Scheduled time too far. Sleeping only 120 seconds (max wait)." | tee -a "$LOG_FILE"
+          sleep 120
+        elif (( WAIT_TIME > 0 )); then
           echo "⏳ Sleeping $WAIT_TIME seconds until scheduled start time..." | tee -a "$LOG_FILE"
           sleep $WAIT_TIME
         else
