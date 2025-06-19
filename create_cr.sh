@@ -83,8 +83,8 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Stage by Stage ===
-echo "⏳ Tracking Change Request state: Assess → Authorize → Scheduled → Implement..." | tee -a "$LOG_FILE"
+# === STEP 4: Monitor State Transitions ===
+echo "⏳ Tracking Change Request state transitions: Assess → Authorize → Scheduled → Implement" | tee -a "$LOG_FILE"
 
 MAX_RETRIES=60
 SLEEP_INTERVAL=30
@@ -107,7 +107,7 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
       echo "🔐 Stage: Authorize | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
       ;;
     "Scheduled")
-      echo "📅 Stage: Scheduled | Waiting for start time: $START_DATE" | tee -a "$LOG_FILE"
+      echo "📅 Stage: Scheduled | Waiting for scheduled start time: $START_DATE" | tee -a "$LOG_FILE"
       if [ "$SCHEDULED_WAIT_DONE" = false ]; then
         CURRENT_EPOCH=$(date +%s)
         START_EPOCH=$(date -d "$START_DATE" +%s)
