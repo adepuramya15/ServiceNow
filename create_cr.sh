@@ -25,11 +25,11 @@ RISK_AND_IMPACT_ANALYSIS="Risk is minimal. If Splunk fails to receive logs, fall
 BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the pipeline."
 TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
 
-# === Scheduling Fields ===
-PLANNED_START_DATE="2025-06-20 09:00:00"
-PLANNED_END_DATE="2025-06-20 10:30:00"
+# === Scheduling Fields (dynamic current time) ===
+NOW=$(date +"%Y-%m-%d %H:%M:%S")
+LATER=$(date -d "+1 hour 30 minutes" +"%Y-%m-%d %H:%M:%S")
 CAB_REQUIRED="true"
-CAB_DATE="2025-06-19 15:00:00"
+CAB_DATE=$(date -d "+1 hour" +"%Y-%m-%d %H:%M:%S")
 ACTUAL_START_DATE=""
 ACTUAL_END_DATE=""
 CAB_DELEGATE="Change Advisory Board"
@@ -58,15 +58,15 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"risk_and_impact_analysis\": \"$RISK_AND_IMPACT_ANALYSIS\",
         \"backout_plan\": \"$BACKOUT_PLAN\",
         \"test_plan\": \"$TEST_PLAN\",
-        \"start_date\": \"$PLANNED_START_DATE\",
-        \"end_date\": \"$PLANNED_END_DATE\",
+        \"start_date\": \"$NOW\",
+        \"end_date\": \"$LATER\",
         \"cab_required\": \"$CAB_REQUIRED\",
         \"cab_date\": \"$CAB_DATE\",
         \"work_start\": \"$ACTUAL_START_DATE\",
         \"work_end\": \"$ACTUAL_END_DATE\",
         \"cab_delegate\": \"$CAB_DELEGATE\",
         \"cab_recommendation\": \"$CAB_RECOMMENDATION\",
-        \"state\": \"Assess\"
+        \"state\": \"Schedule\"
       }")
 
 echo "Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
