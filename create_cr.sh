@@ -83,62 +83,67 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor State Transitions ===
-echo "⏳ Tracking Change Request state transitions: Assess → Authorize → Scheduled → Implement" | tee -a "$LOG_FILE"
+# === STEP 4: Monitor Each Stage ===
+echo "⏳ Waiting for stage transitions: Assess → Authorize → Scheduled → Implement" | tee -a "$LOG_FILE"
 
-MAX_RETRIES=60
+MAX_RETRIES=120
 SLEEP_INTERVAL=30
 COUNT=0
-SCHEDULED_WAIT_DONE=false
+STAGE_PASSED=""
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
     "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID")
 
-  CHANGE_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
-  APPROVAL_STATUS=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
+  STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
+  APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
   START_DATE=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
 
-  case "$CHANGE_STATE" in
+  case "$STATE" in
     "Assess")
-      echo "📝 Stage: Assess | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
+      echo "📝 Current Stage: Assess | Approval: $APPROVAL" | tee -a "$LOG_FILE"
       ;;
     "Authorize")
-      echo "🔐 Stage: Authorize | Approval: $APPROVAL_STATUS" | tee -a "$LOG_FILE"
+      if [[ "$STAGE_PASSED" != *"Authorize"* ]]; then
+        echo "🔐 Moved to Authorize | Approval: $APPROVAL" | tee -a "$LOG_FILE"
+        STAGE_PASSED+="Authorize "
+      fi
       ;;
     "Scheduled")
-      echo "📅 Stage: Scheduled | Waiting for scheduled start time: $START_DATE" | tee -a "$LOG_FILE"
-      if [ "$SCHEDULED_WAIT_DONE" = false ]; then
+      if [[ "$STAGE_PASSED" != *"Scheduled"* ]]; then
+        echo "📅 Moved to Scheduled | Waiting for: $START_DATE" | tee -a "$LOG_FILE"
+
         CURRENT_EPOCH=$(date +%s)
         START_EPOCH=$(date -d "$START_DATE" +%s)
-        SECONDS_TO_WAIT=$(( START_EPOCH - CURRENT_EPOCH ))
-        if (( SECONDS_TO_WAIT > 0 )); then
-          echo "🕒 Sleeping $SECONDS_TO_WAIT seconds until scheduled start time..." | tee -a "$LOG_FILE"
-          sleep $SECONDS_TO_WAIT
+        WAIT_TIME=$((START_EPOCH - CURRENT_EPOCH))
+        if (( WAIT_TIME > 0 )); then
+          echo "⏳ Sleeping $WAIT_TIME seconds until scheduled start time..." | tee -a "$LOG_FILE"
+          sleep $WAIT_TIME
         else
-          echo "⏩ Scheduled time already passed. Continuing..." | tee -a "$LOG_FILE"
+          echo "⏩ Scheduled time already passed. Moving forward..." | tee -a "$LOG_FILE"
         fi
-        SCHEDULED_WAIT_DONE=true
+
+        STAGE_PASSED+="Scheduled "
       fi
       ;;
     "Implement")
-      echo "🚀 Stage: Implement | Execution started." | tee -a "$LOG_FILE"
-      echo "✅ Reached final stage (Implement). Exiting successfully." | tee -a "$LOG_FILE"
+      echo "🚀 Reached Implement Stage | Ready to Execute!" | tee -a "$LOG_FILE"
+      echo "✅ Final stage reached. Exiting successfully." | tee -a "$LOG_FILE"
       exit 0
       ;;
     "Closed" | "Cancelled")
-      echo "❌ Request ended in '$CHANGE_STATE' state. Exiting." | tee -a "$LOG_FILE"
+      echo "❌ Request ended in '$STATE' state. Aborting." | tee -a "$LOG_FILE"
       exit 1
       ;;
     *)
-      echo "🔄 Current Stage: $CHANGE_STATE | Waiting..." | tee -a "$LOG_FILE"
+      echo "🔄 Current Stage: $STATE | Approval: $APPROVAL | Waiting..." | tee -a "$LOG_FILE"
       ;;
   esac
 
-  COUNT=$((COUNT+1))
-  echo "Sleeping $SLEEP_INTERVAL seconds... Retry ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
+  COUNT=$((COUNT + 1))
+  echo "Retrying in $SLEEP_INTERVAL seconds... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
   sleep $SLEEP_INTERVAL
 done
 
-echo "❌ Timeout: Did not reach 'Implement' stage within expected time." | tee -a "$LOG_FILE"
+echo "❌ Timeout: Implement stage was not reached in time." | tee -a "$LOG_FILE"
 exit 1
