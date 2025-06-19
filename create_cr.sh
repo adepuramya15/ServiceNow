@@ -11,9 +11,9 @@ ASSIGNMENT_GROUP="Software"
 REASON="Automated change request for Splunk log integration using Harness CI/CD pipeline."
 REQUESTED_BY="David Loo"
 CATEGORY="Software"
-BUSINESS_SERVICE="Splunk Platform"
+BUSINESS_SERVICE="IT Services"
 SERVICE_OFFERING="Log Ingestion & Monitoring"
-CONFIG_ITEM="Splunk Forwarder Node"
+CONFIG_ITEM="IT Services"
 PRIORITY="3"
 RISK="2"
 IMPACT="2"
@@ -66,7 +66,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"work_end\": \"$ACTUAL_END_DATE\",
         \"cab_delegate\": \"$CAB_DELEGATE\",
         \"cab_recommendation\": \"$CAB_RECOMMENDATION\",
-        \"state\": \"Schedule\"
+        \"state\": \"Assess\"
       }")
 
 echo "Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
