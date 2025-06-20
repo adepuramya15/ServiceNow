@@ -26,11 +26,6 @@ BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the
 TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
 
 # === Scheduling Fields ===
-PLANNED_START_DATE=""
-PLANNED_END_DATE=""
-CAB_DATE=""
-ACTUAL_START_DATE=""
-ACTUAL_END_DATE=""
 CAB_REQUIRED="true"
 CAB_DELEGATE="Change Advisory Board"
 CAB_RECOMMENDATION="Approved - Proceed with minimal risk"
@@ -69,12 +64,7 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
         \"risk_and_impact_analysis\": \"$RISK_AND_IMPACT_ANALYSIS\",
         \"backout_plan\": \"$BACKOUT_PLAN\",
         \"test_plan\": \"$TEST_PLAN\",
-        \"start_date\": \"$PLANNED_START_DATE\",
-        \"end_date\": \"$PLANNED_END_DATE\",
         \"cab_required\": \"$CAB_REQUIRED\",
-        \"cab_date\": \"$CAB_DATE\",
-        \"work_start\": \"$ACTUAL_START_DATE\",
-        \"work_end\": \"$ACTUAL_END_DATE\",
         \"cab_delegate\": \"$CAB_DELEGATE\",
         \"cab_recommendation\": \"$CAB_RECOMMENDATION\",
         \"state\": \"Assess\"
@@ -94,15 +84,15 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Stages with Scheduled Wait ===
+# === STEP 4: Monitor Stages and Enforce Schedule ===
 echo "🔍 Monitoring Change Request progression..." | tee -a "$LOG_FILE"
 
 MAX_RETRIES=120
 SLEEP_INTERVAL=30
 COUNT=0
 SCHEDULED_LOGGED=false
-IMPLEMENT_REACHED=false
 WAITED_FOR_SCHEDULE=false
+IMPLEMENT_REACHED=false
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
@@ -114,37 +104,55 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   RAW_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
   STATE_NAME="${STATE_MAP[$RAW_STATE]:-$RAW_STATE}"
   APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
-  START_DATE_RAW=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
 
   echo "🔄 Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
   if [[ "$STATE_NAME" == "Scheduled" && "$SCHEDULED_LOGGED" == false ]]; then
-    echo "📅 Deployment time set in ServiceNow: $START_DATE_RAW" | tee -a "$LOG_FILE"
+    echo "📅 Change entered Scheduled state. Updating schedule..." | tee -a "$LOG_FILE"
     SCHEDULED_LOGGED=true
 
-    if [[ -n "$START_DATE_RAW" && "$WAITED_FOR_SCHEDULE" == false ]]; then
-      START_TIMESTAMP=$(date -d "$START_DATE_RAW" +%s)
-      CURRENT_TIMESTAMP=$(date -u +%s)
-      WAIT_SECONDS=$((START_TIMESTAMP - CURRENT_TIMESTAMP))
+    # === Calculate new scheduled times ===
+    START_DATE_UTC=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+    END_DATE_UTC=$(date -u -d "+15 minutes" +"%Y-%m-%dT%H:%M:%SZ")
 
-      if [ $WAIT_SECONDS -gt 0 ]; then
-        echo "⏳ Waiting for scheduled time to reach ($WAIT_SECONDS seconds)..." | tee -a "$LOG_FILE"
-        sleep $WAIT_SECONDS
-        echo "⏰ Scheduled time reached. Resuming monitoring..." | tee -a "$LOG_FILE"
-        WAITED_FOR_SCHEDULE=true
-      else
-        echo "⚠️ Scheduled time has already passed. Continuing..." | tee -a "$LOG_FILE"
-        WAITED_FOR_SCHEDULE=true
-      fi
+    echo "🗓️ Setting start_date: $START_DATE_UTC" | tee -a "$LOG_FILE"
+
+    # === PATCH schedule fields ===
+    SCHEDULE_UPDATE=$(curl --silent --request PATCH \
+      "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
+      --user "$SN_USER:$SN_PASS" \
+      --header "Content-Type: application/json" \
+      --data "{
+        \"start_date\": \"$START_DATE_UTC\",
+        \"end_date\": \"$END_DATE_UTC\"
+      }")
+
+    echo "📬 Schedule Update Response: $SCHEDULE_UPDATE" | tee -a "$LOG_FILE"
+
+    # === Wait for the new scheduled time ===
+    START_TS=$(date -d "$START_DATE_UTC" +%s)
+    NOW_TS=$(date -u +%s)
+    WAIT_SECONDS=$((START_TS - NOW_TS))
+
+    if [ $WAIT_SECONDS -gt 0 ]; then
+      echo "⏳ Waiting $WAIT_SECONDS seconds until scheduled time..." | tee -a "$LOG_FILE"
+      sleep $WAIT_SECONDS
+      echo "⏰ Scheduled time reached. Monitoring for Implement stage..." | tee -a "$LOG_FILE"
+      WAITED_FOR_SCHEDULE=true
     fi
   fi
 
-  if [[ "$STATE_NAME" == "Implement" && "$IMPLEMENT_REACHED" == false ]]; then
-    echo "🚀 Reached Implement stage – triggering deployment now." | tee -a "$LOG_FILE"
-    IMPLEMENT_REACHED=true
-    sleep 5
-    echo "✅ Deployment confirmed. Exiting successfully." | tee -a "$LOG_FILE"
-    exit 0
+  if [[ "$STATE_NAME" == "Implement" ]]; then
+    if [[ "$WAITED_FOR_SCHEDULE" == true ]]; then
+      echo "🚀 Reached Implement stage and schedule time met — starting deployment..." | tee -a "$LOG_FILE"
+      # Trigger your deployment here
+      sleep 5
+      echo "✅ Deployment triggered. Exiting successfully." | tee -a "$LOG_FILE"
+      exit 0
+    else
+      echo "⛔ Reached Implement stage BEFORE scheduled time — not allowed!" | tee -a "$LOG_FILE"
+      exit 1
+    fi
   fi
 
   if [[ "$STATE_NAME" == "Closed" || "$STATE_NAME" == "Cancelled" ]]; then
