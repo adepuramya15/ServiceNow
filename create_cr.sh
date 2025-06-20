@@ -29,7 +29,6 @@ CAB_REQUIRED="true"
 CAB_DELEGATE="Change Advisory Board"
 CAB_RECOMMENDATION="Approved - Proceed with minimal risk"
 
-# === State Mapping ===
 declare -A STATE_MAP=(
   ["-5"]="New"
   ["-4"]="Assess"
@@ -48,26 +47,26 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   -u "$SN_USER:$SN_PASS" \
   -H "Content-Type: application/json" \
   -d "{
-        \"short_description\": \"Splunk Log Integration via Harness Pipeline\",
-        \"description\": \"$REASON\",
-        \"category\": \"$CATEGORY\",
-        \"priority\": \"$PRIORITY\",
-        \"risk\": \"$RISK\",
-        \"impact\": \"$IMPACT\",
-        \"assignment_group\": \"$ASSIGNMENT_GROUP\",
-        \"cmdb_ci\": \"$CONFIG_ITEM\",
-        \"business_service\": \"$BUSINESS_SERVICE\",
-        \"service_offering\": \"$SERVICE_OFFERING\",
-        \"justification\": \"$JUSTIFICATION\",
-        \"implementation_plan\": \"$IMPLEMENTATION_PLAN\",
-        \"risk_and_impact_analysis\": \"$RISK_AND_IMPACT_ANALYSIS\",
-        \"backout_plan\": \"$BACKOUT_PLAN\",
-        \"test_plan\": \"$TEST_PLAN\",
-        \"cab_required\": \"$CAB_REQUIRED\",
-        \"cab_delegate\": \"$CAB_DELEGATE\",
-        \"cab_recommendation\": \"$CAB_RECOMMENDATION\",
-        \"state\": \"Assess\"
-      }")
+    \"short_description\": \"Splunk Log Integration via Harness Pipeline\",
+    \"description\": \"$REASON\",
+    \"category\": \"$CATEGORY\",
+    \"priority\": \"$PRIORITY\",
+    \"risk\": \"$RISK\",
+    \"impact\": \"$IMPACT\",
+    \"assignment_group\": \"$ASSIGNMENT_GROUP\",
+    \"cmdb_ci\": \"$CONFIG_ITEM\",
+    \"business_service\": \"$BUSINESS_SERVICE\",
+    \"service_offering\": \"$SERVICE_OFFERING\",
+    \"justification\": \"$JUSTIFICATION\",
+    \"implementation_plan\": \"$IMPLEMENTATION_PLAN\",
+    \"risk_and_impact_analysis\": \"$RISK_AND_IMPACT_ANALYSIS\",
+    \"backout_plan\": \"$BACKOUT_PLAN\",
+    \"test_plan\": \"$TEST_PLAN\",
+    \"cab_required\": \"$CAB_REQUIRED\",
+    \"cab_delegate\": \"$CAB_DELEGATE\",
+    \"cab_recommendation\": \"$CAB_RECOMMENDATION\",
+    \"state\": \"Assess\"
+  }")
 
 echo "📨 Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
 
@@ -83,12 +82,13 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Change ===
+# === STEP 4: Monitor ===
 MAX_RETRIES=120
 SLEEP_INTERVAL=30
 COUNT=0
-SCHEDULED_TIME_WAITED=false
+SCHEDULE_SET=false
 DEPLOYED=false
+SCHEDULE_WAIT_TS=0
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
@@ -103,12 +103,13 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
 
   echo "🔄 Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
-  # === Set start_date = now when in Scheduled state
-  if [[ "$STATE_NAME" == "Scheduled" && "$SCHEDULED_TIME_WAITED" == false ]]; then
+  # Step 1: Set schedule when "Scheduled" stage reached
+  if [[ "$STATE_NAME" == "Scheduled" && "$SCHEDULE_SET" == false ]]; then
     NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     END=$(date -u -d "+10 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+    SCHEDULE_WAIT_TS=$(date -u -d "+5 minutes" +%s)
 
-    echo "🗓️ Setting schedule to START: $NOW and END: $END" | tee -a "$LOG_FILE"
+    echo "🗓️ Setting START=$NOW | END=$END | Wait until TS=$SCHEDULE_WAIT_TS" | tee -a "$LOG_FILE"
 
     curl --silent --request PATCH \
       "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
@@ -119,30 +120,34 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
         \"end_date\": \"$END\"
       }" > /dev/null
 
-    echo "⏳ Waiting 5 minutes after scheduling before allowing implement..." | tee -a "$LOG_FILE"
-    sleep 300  # Wait 5 minutes
-    SCHEDULED_TIME_WAITED=true
+    SCHEDULE_SET=true
   fi
 
-  # === Allow deploy only after 5 min wait and Implement stage
-  if [[ "$STATE_NAME" == "Implement" && "$SCHEDULED_TIME_WAITED" == true && "$DEPLOYED" == false ]]; then
-    echo "🚀 Implement stage reached after schedule wait — starting deployment..." | tee -a "$LOG_FILE"
-    # === Your deployment trigger command goes here ===
-    sleep 5
-    echo "✅ Implemented Done. Deployment completed successfully." | tee -a "$LOG_FILE"
-    DEPLOYED=true
-    exit 0
+  # Step 2: Trigger deployment only if Implement stage reached AND current time > wait timestamp
+  if [[ "$STATE_NAME" == "Implement" && "$DEPLOYED" == false ]]; then
+    CURRENT_TS=$(date -u +%s)
+
+    if [[ "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
+      echo "🚀 Time met and stage is Implement — deploying..." | tee -a "$LOG_FILE"
+      # === PLACE YOUR DEPLOYMENT LOGIC HERE ===
+      sleep 5
+      echo "✅ Implemented Done. Deployment completed successfully." | tee -a "$LOG_FILE"
+      DEPLOYED=true
+      exit 0
+    else
+      echo "⏳ Still waiting. $((SCHEDULE_WAIT_TS - CURRENT_TS))s until allowed to deploy..." | tee -a "$LOG_FILE"
+    fi
   fi
 
   if [[ "$STATE_NAME" == "Closed" || "$STATE_NAME" == "Cancelled" ]]; then
-    echo "❌ Change Request ended in '$STATE_NAME' state. Exiting." | tee -a "$LOG_FILE"
+    echo "❌ Request ended in '$STATE_NAME' state. Exiting." | tee -a "$LOG_FILE"
     exit 1
   fi
 
   COUNT=$((COUNT + 1))
-  echo "⏳ Waiting $SLEEP_INTERVAL seconds before next check... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
+  echo "🔁 Retrying in $SLEEP_INTERVAL seconds... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
   sleep $SLEEP_INTERVAL
 done
 
-echo "❌ Timeout: Change request did not reach Implement stage in expected time." | tee -a "$LOG_FILE"
+echo "❌ Timeout reached without entering Implement stage." | tee -a "$LOG_FILE"
 exit 1
