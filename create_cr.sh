@@ -84,15 +84,14 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Stages and Enforce Schedule ===
+# === STEP 4: Monitor and Enforce Scheduling ===
 echo "🔍 Monitoring Change Request progression..." | tee -a "$LOG_FILE"
 
 MAX_RETRIES=120
 SLEEP_INTERVAL=30
 COUNT=0
-SCHEDULED_LOGGED=false
-WAITED_FOR_SCHEDULE=false
-IMPLEMENT_REACHED=false
+SCHEDULE_SET=false
+DEPLOYED=false
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
@@ -104,66 +103,59 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   RAW_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
   STATE_NAME="${STATE_MAP[$RAW_STATE]:-$RAW_STATE}"
   APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
+  CURRENT_START=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
 
   echo "🔄 Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
-  if [[ "$STATE_NAME" == "Scheduled" && "$SCHEDULED_LOGGED" == false ]]; then
-    echo "📅 Change entered Scheduled state. Updating schedule..." | tee -a "$LOG_FILE"
-    SCHEDULED_LOGGED=true
-
-    # === Calculate new scheduled times ===
+  # === Set schedule when in Scheduled or Implement ===
+  if [[ "$SCHEDULE_SET" == false && ("$STATE_NAME" == "Scheduled" || "$STATE_NAME" == "Implement") ]]; then
     START_DATE_UTC=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
     END_DATE_UTC=$(date -u -d "+15 minutes" +"%Y-%m-%dT%H:%M:%SZ")
 
-    echo "🗓️ Setting start_date: $START_DATE_UTC" | tee -a "$LOG_FILE"
+    echo "📅 Setting schedule from now: $START_DATE_UTC to $END_DATE_UTC" | tee -a "$LOG_FILE"
 
-    # === PATCH schedule fields ===
-    SCHEDULE_UPDATE=$(curl --silent --request PATCH \
+    curl --silent --request PATCH \
       "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
       --user "$SN_USER:$SN_PASS" \
       --header "Content-Type: application/json" \
       --data "{
         \"start_date\": \"$START_DATE_UTC\",
         \"end_date\": \"$END_DATE_UTC\"
-      }")
+      }" > /dev/null
 
-    echo "📬 Schedule Update Response: $SCHEDULE_UPDATE" | tee -a "$LOG_FILE"
-
-    # === Wait for the new scheduled time ===
-    START_TS=$(date -d "$START_DATE_UTC" +%s)
-    NOW_TS=$(date -u +%s)
-    WAIT_SECONDS=$((START_TS - NOW_TS))
-
-    if [ $WAIT_SECONDS -gt 0 ]; then
-      echo "⏳ Waiting $WAIT_SECONDS seconds until scheduled time..." | tee -a "$LOG_FILE"
-      sleep $WAIT_SECONDS
-      echo "⏰ Scheduled time reached. Monitoring for Implement stage..." | tee -a "$LOG_FILE"
-      WAITED_FOR_SCHEDULE=true
-    fi
+    SCHEDULE_SET=true
   fi
 
-  if [[ "$STATE_NAME" == "Implement" ]]; then
-    if [[ "$WAITED_FOR_SCHEDULE" == true ]]; then
-      echo "🚀 Reached Implement stage and schedule time met — starting deployment..." | tee -a "$LOG_FILE"
-      # Trigger your deployment here
-      sleep 5
-      echo "✅ Deployment triggered. Exiting successfully." | tee -a "$LOG_FILE"
-      exit 0
+  # === Trigger deployment only after start date
+  if [[ "$STATE_NAME" == "Implement" && "$DEPLOYED" == false ]]; then
+    if [[ -n "$CURRENT_START" ]]; then
+      CURRENT_START_TS=$(date -d "$CURRENT_START" +%s)
+      NOW_TS=$(date -u +%s)
+      if [ $NOW_TS -ge $CURRENT_START_TS ]; then
+        echo "🚀 Implement stage reached and time is valid. Triggering deployment..." | tee -a "$LOG_FILE"
+        # === PLACE YOUR DEPLOYMENT COMMAND HERE ===
+        sleep 5
+        echo "✅ Deployment triggered successfully!" | tee -a "$LOG_FILE"
+        DEPLOYED=true
+        exit 0
+      else
+        WAIT=$((CURRENT_START_TS - NOW_TS))
+        echo "⛔ Implement stage reached too early. Waiting $WAIT seconds until scheduled start..." | tee -a "$LOG_FILE"
+      fi
     else
-      echo "⛔ Reached Implement stage BEFORE scheduled time — not allowed!" | tee -a "$LOG_FILE"
-      exit 1
+      echo "⚠️ No valid start_date found in change request. Cannot deploy." | tee -a "$LOG_FILE"
     fi
   fi
 
   if [[ "$STATE_NAME" == "Closed" || "$STATE_NAME" == "Cancelled" ]]; then
-    echo "❌ Request ended in '$STATE_NAME' state. Aborting." | tee -a "$LOG_FILE"
+    echo "❌ Change request ended in '$STATE_NAME'. Exiting." | tee -a "$LOG_FILE"
     exit 1
   fi
 
   COUNT=$((COUNT + 1))
-  echo "⏳ Retrying in $SLEEP_INTERVAL seconds... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
+  echo "⏳ Waiting $SLEEP_INTERVAL seconds before retry... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
   sleep $SLEEP_INTERVAL
 done
 
-echo "❌ Timeout: Implement stage was not reached within time." | tee -a "$LOG_FILE"
+echo "❌ Timeout reached without deployment." | tee -a "$LOG_FILE"
 exit 1
