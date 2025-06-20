@@ -94,7 +94,7 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Stages ===
+# === STEP 4: Monitor Stages with Scheduled Wait ===
 echo "🔍 Monitoring Change Request progression..." | tee -a "$LOG_FILE"
 
 MAX_RETRIES=120
@@ -102,6 +102,7 @@ SLEEP_INTERVAL=30
 COUNT=0
 SCHEDULED_LOGGED=false
 IMPLEMENT_REACHED=false
+WAITED_FOR_SCHEDULE=false
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
@@ -113,19 +114,34 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   RAW_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
   STATE_NAME="${STATE_MAP[$RAW_STATE]:-$RAW_STATE}"
   APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
-  START_DATE=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
+  START_DATE_RAW=$(echo "$RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
 
   echo "🔄 Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
   if [[ "$STATE_NAME" == "Scheduled" && "$SCHEDULED_LOGGED" == false ]]; then
-    echo "📅 Deployment time set in ServiceNow: $START_DATE" | tee -a "$LOG_FILE"
+    echo "📅 Deployment time set in ServiceNow: $START_DATE_RAW" | tee -a "$LOG_FILE"
     SCHEDULED_LOGGED=true
+
+    if [[ -n "$START_DATE_RAW" && "$WAITED_FOR_SCHEDULE" == false ]]; then
+      START_TIMESTAMP=$(date -d "$START_DATE_RAW" +%s)
+      CURRENT_TIMESTAMP=$(date -u +%s)
+      WAIT_SECONDS=$((START_TIMESTAMP - CURRENT_TIMESTAMP))
+
+      if [ $WAIT_SECONDS -gt 0 ]; then
+        echo "⏳ Waiting for scheduled time to reach ($WAIT_SECONDS seconds)..." | tee -a "$LOG_FILE"
+        sleep $WAIT_SECONDS
+        echo "⏰ Scheduled time reached. Resuming monitoring..." | tee -a "$LOG_FILE"
+        WAITED_FOR_SCHEDULE=true
+      else
+        echo "⚠️ Scheduled time has already passed. Continuing..." | tee -a "$LOG_FILE"
+        WAITED_FOR_SCHEDULE=true
+      fi
+    fi
   fi
 
   if [[ "$STATE_NAME" == "Implement" && "$IMPLEMENT_REACHED" == false ]]; then
     echo "🚀 Reached Implement stage – triggering deployment now." | tee -a "$LOG_FILE"
     IMPLEMENT_REACHED=true
-    # Wait a few seconds to confirm it doesn’t revert or delay
     sleep 5
     echo "✅ Deployment confirmed. Exiting successfully." | tee -a "$LOG_FILE"
     exit 0
