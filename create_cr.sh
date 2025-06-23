@@ -42,7 +42,7 @@ declare -A STATE_MAP=(
 
 # === STEP 2: Create Change Request ===
 echo "📦 Creating change request..." | tee "$LOG_FILE"
-CREATE_RESPONSE=$(curl --ssl-no-revoke --silent --show-error -X POST \
+CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   "https://$SN_INSTANCE/api/now/table/change_request" \
   -u "$SN_USER:$SN_PASS" \
   -H "Content-Type: application/json" \
@@ -56,10 +56,8 @@ CREATE_RESPONSE=$(curl --ssl-no-revoke --silent --show-error -X POST \
     \"assignment_group\": \"$ASSIGNMENT_GROUP\"
   }")
 
-echo "📨 Response: $CREATE_RESPONSE" | tee -a "$LOG_FILE"
-
-CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^\"]*' | sed 's/\"sys_id\":\"//')
-CHANGE_REQUEST_NUMBER=$(echo "$CREATE_RESPONSE" | grep -o '"number":"[^\"]*' | sed 's/\"number\":\"//')
+CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/\"sys_id\":\"//')
+CHANGE_REQUEST_NUMBER=$(echo "$CREATE_RESPONSE" | grep -o '"number":"[^"]*' | sed 's/\"number\":\"//')
 
 if [ -z "$CHANGE_REQUEST_ID" ]; then
   echo "❌ Failed to extract Change Request ID" | tee -a "$LOG_FILE"
@@ -69,9 +67,9 @@ fi
 echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
-# === STEP 3: Update with planning fields ===
+# === STEP 3: Update Planning Fields ===
 echo "🔄 Updating change request with planning fields..." | tee -a "$LOG_FILE"
-curl --ssl-no-revoke --silent --show-error --request PATCH \
+curl --silent --request PATCH \
   "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
   --user "$SN_USER:$SN_PASS" \
   --header "Content-Type: application/json" \
@@ -90,94 +88,51 @@ curl --ssl-no-revoke --silent --show-error --request PATCH \
     \"state\": \"Assess\"
   }" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Stages and Handle Implementation ===
-MAX_RETRIES=60
+# === STEP 4: Monitor and Trigger Implementation ===
+MAX_RETRIES=30
 SLEEP_INTERVAL=30
 COUNT=0
-SCHEDULE_LOGGED=false
-IMPLEMENTED=false
-IMPLEMENT_STARTED=false
 
 while [ $COUNT -lt $MAX_RETRIES ]; do
   CURRENT_UTC=$(date -u +"%Y-%m-%d %H:%M:%S")
-  RESPONSE=$(curl --ssl-no-revoke --silent --user "$SN_USER:$SN_PASS" \
+  RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
     "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID")
 
-  RAW_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^\"]*' | sed 's/\"state\":\"//')
+  RAW_STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/\"state\":\"//')
   STATE_NAME="${STATE_MAP[$RAW_STATE]:-$RAW_STATE}"
-  APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^\"]*' | sed 's/\"approval\":\"//')
+  APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/\"approval\":\"//')
 
   echo "🕒 [$CURRENT_UTC] Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
-  if [[ "$APPROVAL" == "rejected" ]]; then
-    echo "❌ Change Request was rejected in '$STATE_NAME' stage. Exiting." | tee -a "$LOG_FILE"
-    exit 1
-  fi
-
   case "$STATE_NAME" in
     "Assess")
-      echo "📘 Step 1: Assess stage – under review." | tee -a "$LOG_FILE"
+      echo "📘 Step 1: Assess stage - under review." | tee -a "$LOG_FILE"
       ;;
     "Authorize")
-      echo "📗 Step 2: Authorize stage – CAB reviewing..." | tee -a "$LOG_FILE"
+      echo "📗 Step 2: Authorize stage - CAB review in progress." | tee -a "$LOG_FILE"
       ;;
     "Scheduled")
-      echo "📙 Step 3: Scheduled stage – preparing implementation window." | tee -a "$LOG_FILE"
-      if [[ "$SCHEDULE_LOGGED" == false ]]; then
-        START_IST=$(TZ="Asia/Kolkata" date -d "+1 minute" +"%Y-%m-%d %H:%M:%S")
-        END_IST=$(TZ="Asia/Kolkata" date -d "+10 minutes" +"%Y-%m-%d %H:%M:%S")
-        START_UTC=$(TZ="Asia/Kolkata" date -d "$START_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(TZ="Asia/Kolkata" date -d "$END_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
-        SCHEDULE_WAIT_TS=$(date -u -d "$START_UTC" +%s)
-
-        curl --ssl-no-revoke --silent --request PATCH \
-          "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
-          --user "$SN_USER:$SN_PASS" \
-          --header "Content-Type: application/json" \
-          --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
-
-        echo "🗓️ Implementation window set:\n   ✅ IST Start: $START_IST\n   ✅ IST End: $END_IST\n   🌐 UTC Start: $START_UTC\n   🌐 UTC End: $END_UTC" | tee -a "$LOG_FILE"
-        SCHEDULE_LOGGED=true
-      fi
+      echo "📙 Step 3: Scheduled stage - setting 2 minute window." | tee -a "$LOG_FILE"
+      START_UTC=$(date -u -d "+1 minute" +"%Y-%m-%dT%H:%M:%SZ")
+      END_UTC=$(date -u -d "+3 minute" +"%Y-%m-%dT%H:%M:%SZ")
+      curl --silent --request PATCH \
+        "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
+        --user "$SN_USER:$SN_PASS" \
+        --header "Content-Type: application/json" \
+        --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
+      echo "🗓️ Schedule set: Start - $START_UTC | End - $END_UTC" | tee -a "$LOG_FILE"
       ;;
     "Implement")
-      echo "📕 Step 4: Implement stage – ready for execution." | tee -a "$LOG_FILE"
-      if [[ "$SCHEDULE_LOGGED" == false ]]; then
-        echo "⚠️ Schedule not set earlier. Setting it now while in Implement stage..." | tee -a "$LOG_FILE"
-        START_IST=$(TZ="Asia/Kolkata" date -d "+1 minute" +"%Y-%m-%d %H:%M:%S")
-        END_IST=$(TZ="Asia/Kolkata" date -d "+10 minutes" +"%Y-%m-%d %H:%M:%S")
-        START_UTC=$(TZ="Asia/Kolkata" date -d "$START_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(TZ="Asia/Kolkata" date -d "$END_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
-        SCHEDULE_WAIT_TS=$(date -u -d "$START_UTC" +%s)
-
-        curl --silent --request PATCH \
-          "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
-          --user "$SN_USER:$SN_PASS" \
-          --header "Content-Type: application/json" \
-          --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
-
-        echo "🗓️ Schedule set during Implement stage:\n   ✅ IST Start: $START_IST\n   ✅ IST End: $END_IST\n   🌐 UTC Start: $START_UTC\n   🌐 UTC End: $END_UTC" | tee -a "$LOG_FILE"
-        SCHEDULE_LOGGED=true
-      fi
-
-      CURRENT_TS=$(date -u +%s)
-      if [[ "$IMPLEMENTED" == false && "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
-        echo "🚀 Time reached. Starting implementation..." | tee -a "$LOG_FILE"
-        sleep 5  # Simulate implementation
-        echo "✅ Implementation completed successfully." | tee -a "$LOG_FILE"
-        IMPLEMENTED=true
-        exit 0
-      else
-        REMAINING=$((SCHEDULE_WAIT_TS - CURRENT_TS))
-        echo "⏳ Waiting... $REMAINING seconds remaining." | tee -a "$LOG_FILE"
-      fi
+      echo "📕 Step 4: Implement stage - executing now..." | tee -a "$LOG_FILE"
+      echo "✅ Implementation completed." | tee -a "$LOG_FILE"
+      exit 0
       ;;
     "Closed"|"Cancelled")
       echo "❌ Change Request ended in '$STATE_NAME'. Exiting." | tee -a "$LOG_FILE"
       exit 1
       ;;
     *)
-      echo "🔍 Unknown stage: $STATE_NAME – monitoring continues." | tee -a "$LOG_FILE"
+      echo "🔍 Unknown stage '$STATE_NAME'. Waiting..." | tee -a "$LOG_FILE"
       ;;
   esac
 
