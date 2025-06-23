@@ -90,7 +90,7 @@ curl --ssl-no-revoke --silent --show-error --request PATCH \
     \"state\": \"Assess\"
   }" | tee -a "$LOG_FILE"
 
-# === STEP 4: Monitor Stages and Set Dynamic Schedule ===
+# === STEP 4: Monitor Stages and Handle Deployment ===
 MAX_RETRIES=60
 SLEEP_INTERVAL=30
 COUNT=0
@@ -116,16 +116,16 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
 
   case "$STATE_NAME" in
     "Assess")
-      echo "📘 Step 1: Change Request is in *Assess* stage.\n   🔹 Waiting for Change Manager to assess the risk and scope."
+      echo "📘 Step 1: Assess stage – waiting for Change Manager review." | tee -a "$LOG_FILE"
       ;;
     "Authorize")
-      echo "📗 Step 2: Change Request is in *Authorize* stage.\n   🔹 Awaiting approval from Change Advisory Board (CAB)."
+      echo "📗 Step 2: Authorize stage – CAB approval in progress." | tee -a "$LOG_FILE"
       ;;
     "Scheduled")
-      echo "📙 Step 3: Change Request is in *Scheduled* stage.\n   🔹 CAB has approved. Setting deployment window..."
+      echo "📙 Step 3: Scheduled stage – preparing deployment window." | tee -a "$LOG_FILE"
       if [[ "$SCHEDULE_LOGGED" == false ]]; then
-        START_IST=$(TZ="Asia/Kolkata" date -d "+5 minutes" +"%Y-%m-%d %H:%M:%S")
-        END_IST=$(TZ="Asia/Kolkata" date -d "+35 minutes" +"%Y-%m-%d %H:%M:%S")
+        START_IST=$(TZ="Asia/Kolkata" date -d "+1 minute" +"%Y-%m-%d %H:%M:%S")
+        END_IST=$(TZ="Asia/Kolkata" date -d "+10 minutes" +"%Y-%m-%d %H:%M:%S")
 
         START_UTC=$(TZ="Asia/Kolkata" date -d "$START_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
         END_UTC=$(TZ="Asia/Kolkata" date -d "$END_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -137,28 +137,32 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
           --header "Content-Type: application/json" \
           --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
 
-        echo "🗓️ Deployment Window Scheduled:\n   ✅ IST Start: $START_IST\n   ✅ IST End:   $END_IST\n   🌐 UTC Start: $START_UTC\n   🌐 UTC End:   $END_UTC\n   🕰️ Waiting until: $SCHEDULE_WAIT_TS (UTC Epoch)" | tee -a "$LOG_FILE"
+        echo "🗓️ Deployment window set:\n   ✅ IST Start: $START_IST\n   ✅ IST End: $END_IST\n   🌐 UTC Start: $START_UTC\n   🌐 UTC End: $END_UTC" | tee -a "$LOG_FILE"
         SCHEDULE_LOGGED=true
       fi
       ;;
     "Implement")
-      echo "📕 Step 4: Change Request is in *Implement* stage.\n   🔹 Approved to deploy. Preparing for execution..."
+      echo "📕 Step 4: Implement stage – deployment approved." | tee -a "$LOG_FILE"
       if [[ "$IMPLEMENT_STARTED" == false ]]; then
-        echo "🔧 Implementation window started. Waiting for scheduled time..." | tee -a "$LOG_FILE"
+        echo "🔧 Waiting for deployment time..." | tee -a "$LOG_FILE"
         IMPLEMENT_STARTED=true
       fi
 
       CURRENT_TS=$(date -u +%s)
+      if [[ "$SCHEDULE_LOGGED" == false ]]; then
+        echo "⚠️ Schedule not set earlier. Forcing fallback to immediate deploy in 5 seconds." | tee -a "$LOG_FILE"
+        SCHEDULE_WAIT_TS=$((CURRENT_TS + 5))
+      fi
 
       if [[ "$DEPLOYED" == false && "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
-        echo "🚀 Scheduled time reached. Starting deployment..." | tee -a "$LOG_FILE"
-        sleep 5
+        echo "🚀 Time reached. Starting deployment..." | tee -a "$LOG_FILE"
+        sleep 5  # Replace with real deploy logic
         echo "✅ Deployment completed successfully." | tee -a "$LOG_FILE"
         DEPLOYED=true
         exit 0
       else
         REMAINING=$((SCHEDULE_WAIT_TS - CURRENT_TS))
-        echo "⏳ Waiting... $REMAINING seconds until deploy." | tee -a "$LOG_FILE"
+        echo "⏳ Waiting... $REMAINING seconds remaining." | tee -a "$LOG_FILE"
       fi
       ;;
     "Closed"|"Cancelled")
@@ -166,7 +170,7 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
       exit 1
       ;;
     *)
-      echo "🔍 Unknown or unhandled state: $STATE_NAME" | tee -a "$LOG_FILE"
+      echo "🔍 Unknown stage: $STATE_NAME – monitoring continues." | tee -a "$LOG_FILE"
       ;;
   esac
 
