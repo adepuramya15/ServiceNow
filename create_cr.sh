@@ -115,10 +115,15 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
   fi
 
   case "$STATE_NAME" in
+    "Assess")
+      echo "📘 Step 1: Change Request is in *Assess* stage.\n   🔹 Waiting for Change Manager to assess the risk and scope."
+      ;;
+    "Authorize")
+      echo "📗 Step 2: Change Request is in *Authorize* stage.\n   🔹 Awaiting approval from Change Advisory Board (CAB)."
+      ;;
     "Scheduled")
+      echo "📙 Step 3: Change Request is in *Scheduled* stage.\n   🔹 CAB has approved. Setting deployment window..."
       if [[ "$SCHEDULE_LOGGED" == false ]]; then
-        echo "📆 Step 5: Change is Scheduled. Calculating deployment window..." | tee -a "$LOG_FILE"
-
         START_IST=$(TZ="Asia/Kolkata" date -d "+5 minutes" +"%Y-%m-%d %H:%M:%S")
         END_IST=$(TZ="Asia/Kolkata" date -d "+35 minutes" +"%Y-%m-%d %H:%M:%S")
 
@@ -132,46 +137,36 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
           --header "Content-Type: application/json" \
           --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
 
-        echo "🗓️ Schedule set:
-        ✅ IST START: $START_IST
-        ✅ IST END:   $END_IST
-        🌐 UTC START: $START_UTC
-        🌐 UTC END:   $END_UTC
-        🕰️ Deploy after: $SCHEDULE_WAIT_TS" | tee -a "$LOG_FILE"
-
+        echo "🗓️ Deployment Window Scheduled:\n   ✅ IST Start: $START_IST\n   ✅ IST End:   $END_IST\n   🌐 UTC Start: $START_UTC\n   🌐 UTC End:   $END_UTC\n   🕰️ Waiting until: $SCHEDULE_WAIT_TS (UTC Epoch)" | tee -a "$LOG_FILE"
         SCHEDULE_LOGGED=true
       fi
       ;;
     "Implement")
+      echo "📕 Step 4: Change Request is in *Implement* stage.\n   🔹 Approved to deploy. Preparing for execution..."
       if [[ "$IMPLEMENT_STARTED" == false ]]; then
-        echo "🔧 Step 6: Entered Implement stage. Waiting for schedule..." | tee -a "$LOG_FILE"
+        echo "🔧 Implementation window started. Waiting for scheduled time..." | tee -a "$LOG_FILE"
         IMPLEMENT_STARTED=true
       fi
 
       CURRENT_TS=$(date -u +%s)
 
-      if [[ "$DEPLOYED" == false ]]; then
-        if [[ "$HARNESS_DEPLOY" == "true" ]]; then
-          echo "🚀 Harness detected — skipping schedule wait." | tee -a "$LOG_FILE"
-          sleep 5
-          echo "✅ Step 8: Deployment completed successfully (Harness)." | tee -a "$LOG_FILE"
-          DEPLOYED=true
-          exit 0
-        elif [[ "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
-          echo "🚀 Step 7: Deployment starting..." | tee -a "$LOG_FILE"
-          sleep 5
-          echo "✅ Step 8: Deployment completed successfully." | tee -a "$LOG_FILE"
-          DEPLOYED=true
-          exit 0
-        else
-          REMAINING=$((SCHEDULE_WAIT_TS - CURRENT_TS))
-          echo "⏳ Waiting for scheduled time... $REMAINING seconds remaining." | tee -a "$LOG_FILE"
-        fi
+      if [[ "$DEPLOYED" == false && "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
+        echo "🚀 Scheduled time reached. Starting deployment..." | tee -a "$LOG_FILE"
+        sleep 5
+        echo "✅ Deployment completed successfully." | tee -a "$LOG_FILE"
+        DEPLOYED=true
+        exit 0
+      else
+        REMAINING=$((SCHEDULE_WAIT_TS - CURRENT_TS))
+        echo "⏳ Waiting... $REMAINING seconds until deploy." | tee -a "$LOG_FILE"
       fi
       ;;
     "Closed"|"Cancelled")
       echo "❌ Change Request ended in '$STATE_NAME'. Exiting." | tee -a "$LOG_FILE"
       exit 1
+      ;;
+    *)
+      echo "🔍 Unknown or unhandled state: $STATE_NAME" | tee -a "$LOG_FILE"
       ;;
   esac
 
