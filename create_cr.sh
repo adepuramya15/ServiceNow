@@ -119,11 +119,9 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
       if [[ "$SCHEDULE_LOGGED" == false ]]; then
         echo "📆 Step 5: Change is Scheduled. Calculating deployment window..." | tee -a "$LOG_FILE"
 
-        # IST time calculation
         START_IST=$(TZ="Asia/Kolkata" date -d "+5 minutes" +"%Y-%m-%d %H:%M:%S")
         END_IST=$(TZ="Asia/Kolkata" date -d "+35 minutes" +"%Y-%m-%d %H:%M:%S")
 
-        # Convert to UTC
         START_UTC=$(TZ="Asia/Kolkata" date -d "$START_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
         END_UTC=$(TZ="Asia/Kolkata" date -d "$END_IST" -u +"%Y-%m-%dT%H:%M:%SZ")
         SCHEDULE_WAIT_TS=$(date -u -d "$START_UTC" +%s)
@@ -149,16 +147,26 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
         echo "🔧 Step 6: Entered Implement stage. Waiting for schedule..." | tee -a "$LOG_FILE"
         IMPLEMENT_STARTED=true
       fi
+
       CURRENT_TS=$(date -u +%s)
-      if [[ "$DEPLOYED" == false && "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
-        echo "🚀 Step 7: Deployment starting..." | tee -a "$LOG_FILE"
-        sleep 5  # Replace this with your actual deployment logic
-        echo "✅ Step 8: Deployment completed successfully." | tee -a "$LOG_FILE"
-        DEPLOYED=true
-        exit 0
-      else
-        REMAINING=$((SCHEDULE_WAIT_TS - CURRENT_TS))
-        echo "⏳ Waiting for implement time... $REMAINING seconds remaining." | tee -a "$LOG_FILE"
+
+      if [[ "$DEPLOYED" == false ]]; then
+        if [[ "$HARNESS_DEPLOY" == "true" ]]; then
+          echo "🚀 Harness detected — skipping schedule wait." | tee -a "$LOG_FILE"
+          sleep 5
+          echo "✅ Step 8: Deployment completed successfully (Harness)." | tee -a "$LOG_FILE"
+          DEPLOYED=true
+          exit 0
+        elif [[ "$CURRENT_TS" -ge "$SCHEDULE_WAIT_TS" ]]; then
+          echo "🚀 Step 7: Deployment starting..." | tee -a "$LOG_FILE"
+          sleep 5
+          echo "✅ Step 8: Deployment completed successfully." | tee -a "$LOG_FILE"
+          DEPLOYED=true
+          exit 0
+        else
+          REMAINING=$((SCHEDULE_WAIT_TS - CURRENT_TS))
+          echo "⏳ Waiting for scheduled time... $REMAINING seconds remaining." | tee -a "$LOG_FILE"
+        fi
       fi
       ;;
     "Closed"|"Cancelled")
