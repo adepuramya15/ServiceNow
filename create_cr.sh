@@ -17,6 +17,7 @@ CONFIG_ITEM="IT Services"
 PRIORITY="3"
 RISK="2"
 IMPACT="2"
+ASSIGNED_TO_SYS_ID="ed36e12b9782a61077bf3fdce053af01"  # 🔁 Replace with actual sys_id of ramya_adepu
 
 # === Planning Fields ===
 JUSTIFICATION="Integrating Splunk logging into Harness CI/CD pipeline for enhanced monitoring and automated event visibility."
@@ -31,13 +32,9 @@ CAB_RECOMMENDATION="Approved - Proceed with minimal risk"
 
 # === State Mapping ===
 declare -A STATE_MAP=(
-  ["-5"]="New"
-  ["-4"]="Assess"
-  ["-3"]="Authorize"
-  ["-2"]="Scheduled"
-  ["-1"]="Implement"
-  ["3"]="Closed"
-  ["4"]="Cancelled"
+  ["-5"]="New" ["-4"]="Assess" ["-3"]="Authorize"
+  ["-2"]="Scheduled" ["-1"]="Implement"
+  ["3"]="Closed" ["4"]="Cancelled"
 )
 
 # === Stage Tracking Flags ===
@@ -58,7 +55,8 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
     \"priority\": \"$PRIORITY\",
     \"risk\": \"$RISK\",
     \"impact\": \"$IMPACT\",
-    \"assignment_group\": \"$ASSIGNMENT_GROUP\"
+    \"assignment_group\": \"$ASSIGNMENT_GROUP\",
+    \"assigned_to\": \"$ASSIGNED_TO_SYS_ID\"
   }")
 
 CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/\"sys_id\":\"//')
