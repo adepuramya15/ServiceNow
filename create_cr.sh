@@ -40,6 +40,8 @@ declare -A STATE_MAP=(
   ["4"]="Cancelled"
 )
 
+SCHEDULED_FLAG=false
+
 # === STEP 2: Create Change Request ===
 echo "📦 Creating change request..." | tee "$LOG_FILE"
 CREATE_RESPONSE=$(curl --silent --show-error -X POST \
@@ -110,27 +112,42 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
     exit 1
   fi
 
+  # ⏳ Check and insert Scheduled stage manually if needed
+  if [[ "$STATE_NAME" == "Implement" && "$SCHEDULED_FLAG" == "false" ]]; then
+    echo "⚠️ Skipped Scheduled stage - injecting schedule before implementation..." | tee -a "$LOG_FILE"
+    START_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    END_UTC=$(date -u -d "+2 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+    curl --silent --request PATCH \
+      "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
+      --user "$SN_USER:$SN_PASS" \
+      --header "Content-Type: application/json" \
+      --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
+    echo "🗓️ Manually scheduled: Start - $START_UTC | End - $END_UTC" | tee -a "$LOG_FILE"
+    SCHEDULED_FLAG=true
+  fi
+
   case "$STATE_NAME" in
     "Assess")
-      echo "📘 Step 1: Assess stage - under review." | tee -a "$LOG_FILE"
+      echo "📘 Step 1: Assess stage - waiting for evaluation." | tee -a "$LOG_FILE"
       ;;
     "Authorize")
-      echo "📗 Step 2: Authorize stage - CAB review in progress." | tee -a "$LOG_FILE"
+      echo "📗 Step 2: Authorize stage - pending CAB approval." | tee -a "$LOG_FILE"
       ;;
     "Scheduled")
-      echo "📙 Step 3: Scheduled stage - setting 2 minute window." | tee -a "$LOG_FILE"
-      START_UTC=$(date -u -d "+1 minute" +"%Y-%m-%dT%H:%M:%SZ")
-      END_UTC=$(date -u -d "+3 minute" +"%Y-%m-%dT%H:%M:%SZ")
+      echo "📙 Step 3: Scheduled stage - setting scheduled window." | tee -a "$LOG_FILE"
+      START_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      END_UTC=$(date -u -d "+2 minutes" +"%Y-%m-%dT%H:%M:%SZ")
       curl --silent --request PATCH \
         "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
         --user "$SN_USER:$SN_PASS" \
         --header "Content-Type: application/json" \
         --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
-      echo "🗓️ Schedule set: Start - $START_UTC | End - $END_UTC" | tee -a "$LOG_FILE"
+      echo "🗓️ Schedule confirmed: Start - $START_UTC | End - $END_UTC" | tee -a "$LOG_FILE"
+      SCHEDULED_FLAG=true
       ;;
     "Implement")
-      echo "📕 Step 4: Implement stage - executing now..." | tee -a "$LOG_FILE"
-      echo "✅ Implementation completed." | tee -a "$LOG_FILE"
+      echo "📕 Step 4: Implement stage - executing change now..." | tee -a "$LOG_FILE"
+      echo "✅ Implementation completed successfully." | tee -a "$LOG_FILE"
       exit 0
       ;;
     "Closed"|"Cancelled")
@@ -138,7 +155,7 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
       exit 1
       ;;
     *)
-      echo "🔍 Unknown stage '$STATE_NAME'. Waiting..." | tee -a "$LOG_FILE"
+      echo "🔍 Waiting... Current stage '$STATE_NAME' is not recognized for action." | tee -a "$LOG_FILE"
       ;;
   esac
 
