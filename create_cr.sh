@@ -40,7 +40,7 @@ declare -A STATE_MAP=(
   ["4"]="Cancelled"
 )
 
-# === Stage Tracking ===
+# === Stage Tracking Flags ===
 ASSESS_LOGGED=false
 AUTHORIZE_LOGGED=false
 SCHEDULED_LOGGED=false
@@ -129,45 +129,57 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
       ;;
     "Scheduled")
       if [ "$SCHEDULED_LOGGED" = false ]; then
-        IST_NOW=$(TZ=Asia/Kolkata date +"%Y-%m-%d %H:%M:%S")
+        IST_START=$(TZ=Asia/Kolkata date +"%Y-%m-%d %H:%M:%S")
+        IST_END=$(TZ=Asia/Kolkata date -d "+5 minutes" +"%Y-%m-%d %H:%M:%S")
         START_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(date -u -d "+2 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+        END_UTC=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+
         echo "📙 Step 3: Scheduled stage reached." | tee -a "$LOG_FILE"
         echo "🗓️ Scheduled Time (IST / UTC):" | tee -a "$LOG_FILE"
-        echo "   👉 IST Start: $IST_NOW" | tee -a "$LOG_FILE"
+        echo "   👉 IST Start: $IST_START" | tee -a "$LOG_FILE"
+        echo "   👉 IST End  : $IST_END"   | tee -a "$LOG_FILE"
         echo "   👉 UTC Start: $START_UTC" | tee -a "$LOG_FILE"
-        echo "   👉 UTC End  : $END_UTC" | tee -a "$LOG_FILE"
+        echo "   👉 UTC End  : $END_UTC"   | tee -a "$LOG_FILE"
+
         curl --silent --request PATCH \
           "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
           --user "$SN_USER:$SN_PASS" \
           --header "Content-Type: application/json" \
           --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
+
         SCHEDULED_LOGGED=true
       fi
       ;;
     "Implement")
-      # Inject schedule if skipped
+      # Inject scheduled window if it was skipped
       if [ "$SCHEDULED_LOGGED" = false ]; then
-        IST_NOW=$(TZ=Asia/Kolkata date +"%Y-%m-%d %H:%M:%S")
+        IST_START=$(TZ=Asia/Kolkata date +"%Y-%m-%d %H:%M:%S")
+        IST_END=$(TZ=Asia/Kolkata date -d "+5 minutes" +"%Y-%m-%d %H:%M:%S")
         START_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(date -u -d "+2 minutes" +"%Y-%m-%dT%H:%M:%SZ")
-        echo "⚠️ Step 3: Scheduled stage was skipped. Injecting manually..." | tee -a "$LOG_FILE"
-        echo "🗓️ Scheduled Time (IST / UTC):" | tee -a "$LOG_FILE"
-        echo "   👉 IST Start: $IST_NOW" | tee -a "$LOG_FILE"
+        END_UTC=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+
+        echo "⚠️ Scheduled stage was skipped. Forcing Schedule stage before implementation..." | tee -a "$LOG_FILE"
+        echo "📙 Step 3 (Forced): Scheduled stage enforced." | tee -a "$LOG_FILE"
+        echo "🗓️ Injected Schedule Time (IST / UTC):" | tee -a "$LOG_FILE"
+        echo "   👉 IST Start: $IST_START" | tee -a "$LOG_FILE"
+        echo "   👉 IST End  : $IST_END"   | tee -a "$LOG_FILE"
         echo "   👉 UTC Start: $START_UTC" | tee -a "$LOG_FILE"
-        echo "   👉 UTC End  : $END_UTC" | tee -a "$LOG_FILE"
+        echo "   👉 UTC End  : $END_UTC"   | tee -a "$LOG_FILE"
+
         curl --silent --request PATCH \
           "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
           --user "$SN_USER:$SN_PASS" \
           --header "Content-Type: application/json" \
           --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
+
         SCHEDULED_LOGGED=true
       fi
-      # Log skipped stages if needed
+
       if [ "$AUTHORIZE_LOGGED" = false ]; then
         echo "⚠️ Step 2: Authorize stage was skipped. Marking as auto-approved." | tee -a "$LOG_FILE"
         AUTHORIZE_LOGGED=true
       fi
+
       echo "📕 Step 4: Implement stage - executing change now..." | tee -a "$LOG_FILE"
       echo "✅ Step 5: Implementation completed successfully." | tee -a "$LOG_FILE"
       exit 0
