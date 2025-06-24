@@ -30,7 +30,7 @@ CAB_REQUIRED="true"
 CAB_DELEGATE="Change Advisory Board"
 CAB_RECOMMENDATION="Approved - Proceed with minimal risk"
 
-# === STEP 2: Create Change Request ===
+# === STEP 2: Create CR ===
 echo "📦 Creating change request..." | tee "$LOG_FILE"
 CREATE_RESPONSE=$(curl --silent --show-error -X POST \
   "https://$SN_INSTANCE/api/now/table/change_request" \
@@ -108,15 +108,18 @@ while [ $CURRENT_STAGE_INDEX -lt ${#STAGES[@]} ]; do
     if [[ "$STATE" == "$TARGET_STATE" ]]; then
       echo "✅ Stage reached: $CURRENT_STAGE" | tee -a "$LOG_FILE"
 
-      # === Scheduled stage logic with wait ===
+      # If "Scheduled", set schedule time and wait until it
       if [[ "$CURRENT_STAGE" == "Scheduled" ]]; then
-        IST_NOW=$(TZ=Asia/Kolkata date +"%Y-%m-%d %H:%M:%S")
-        START_UTC=$(TZ=Asia/Kolkata date -d "$IST_NOW" -u +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(TZ=Asia/Kolkata date -d "$IST_NOW +5 minutes" -u +"%Y-%m-%dT%H:%M:%SZ")
+        START_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        END_UTC=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+        IST_START=$(TZ=Asia/Kolkata date +"%Y-%m-%d %H:%M:%S")
+        IST_END=$(TZ=Asia/Kolkata date -d "+5 minutes" +"%Y-%m-%d %H:%M:%S")
 
         echo "📅 Setting schedule window:" | tee -a "$LOG_FILE"
+        echo "👉 IST Start: $IST_START" | tee -a "$LOG_FILE"
+        echo "👉 IST End  : $IST_END" | tee -a "$LOG_FILE"
         echo "👉 UTC Start: $START_UTC" | tee -a "$LOG_FILE"
-        echo "👉 UTC End  : $END_UTC" | tee -a "$LOG_FILE"
+        echo "👉 UTC End  : $END_UTC"   | tee -a "$LOG_FILE"
 
         curl --silent --request PATCH \
           "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
@@ -124,12 +127,12 @@ while [ $CURRENT_STAGE_INDEX -lt ${#STAGES[@]} ]; do
           --header "Content-Type: application/json" \
           --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
 
-        # Wait until the UTC time matches or exceeds scheduled start time
-        echo "⏳ Waiting for UTC time to reach scheduled start time: $START_UTC" | tee -a "$LOG_FILE"
+        # Wait until actual UTC time reaches START_UTC
+        echo "⏳ Waiting for scheduled time to start: $START_UTC" | tee -a "$LOG_FILE"
         while true; do
           CURRENT_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           if [[ "$CURRENT_UTC" > "$START_UTC" || "$CURRENT_UTC" == "$START_UTC" ]]; then
-            echo "✅ Scheduled time reached: $CURRENT_UTC" | tee -a "$LOG_FILE"
+            echo "✅ Scheduled start time reached: $CURRENT_UTC" | tee -a "$LOG_FILE"
             break
           fi
           echo "⏱ Still waiting... Current UTC: $CURRENT_UTC" | tee -a "$LOG_FILE"
@@ -137,7 +140,6 @@ while [ $CURRENT_STAGE_INDEX -lt ${#STAGES[@]} ]; do
         done
       fi
 
-      # Proceed to next stage
       CURRENT_STAGE_INDEX=$((CURRENT_STAGE_INDEX + 1))
       break
     fi
