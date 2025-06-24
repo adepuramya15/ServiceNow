@@ -104,6 +104,12 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
 
   echo "🕒 [$CURRENT_UTC] Stage: $STATE_NAME | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
+  # 🛑 Check if rejected
+  if [[ "$APPROVAL" == "rejected" ]]; then
+    echo "❌ Change Request was rejected. Exiting pipeline." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+
   case "$STATE_NAME" in
     "Assess")
       echo "📘 Step 1: Assess stage - under review." | tee -a "$LOG_FILE"
