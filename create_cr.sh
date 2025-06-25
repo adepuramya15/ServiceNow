@@ -47,22 +47,22 @@ CREATE_RESPONSE=$(curl --silent --show-error -X POST \
     \"assigned_to\": \"$ASSIGNED_TO_SYS_ID\"
   }")
 
-CHANGE_REQUEST_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/"sys_id":"//')
+SYS_ID=$(echo "$CREATE_RESPONSE" | grep -o '"sys_id":"[^"]*' | sed 's/"sys_id":"//')
 CHANGE_REQUEST_NUMBER=$(echo "$CREATE_RESPONSE" | grep -o '"number":"[^"]*' | sed 's/"number":"//')
 
-if [ -z "$CHANGE_REQUEST_ID" ]; then
+if [ -z "$SYS_ID" ]; then
   echo "❌ Failed to extract Change Request ID" | tee -a "$LOG_FILE"
   echo "$CREATE_RESPONSE" | tee -a "$LOG_FILE"
   exit 1
 fi
 
-echo "✅ Change Request ID: $CHANGE_REQUEST_ID" | tee -a "$LOG_FILE"
+echo "✅ Change Request ID: $SYS_ID" | tee -a "$LOG_FILE"
 echo "📌 Change Request Number: $CHANGE_REQUEST_NUMBER" | tee -a "$LOG_FILE"
 
 # === STEP 3: Update Planning Fields ===
 echo "🔄 Updating planning fields..." | tee -a "$LOG_FILE"
 curl --silent --request PATCH \
-  "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
+  "https://$SN_INSTANCE/api/now/table/change_request/$SYS_ID" \
   --user "$SN_USER:$SN_PASS" \
   --header "Content-Type: application/json" \
   --data "{
@@ -80,91 +80,76 @@ curl --silent --request PATCH \
     \"state\": \"Assess\"
   }" > /dev/null
 
-# === STEP 4: Monitor CR Progress ===
-STAGES=("Assess" "Authorize" "Scheduled" "Implement")
+# === STEP 4: Monitor Change Request Progress ===
+SCHEDULED_SET=false
+WAITED_FOR_START=false
 MAX_RETRIES=60
 SLEEP_INTERVAL=30
-CURRENT_STAGE_INDEX=0
+COUNT=0
 
-while [ $CURRENT_STAGE_INDEX -lt ${#STAGES[@]} ]; do
-  CURRENT_STAGE="${STAGES[$CURRENT_STAGE_INDEX]}"
-  echo "🔍 Waiting for stage: $CURRENT_STAGE..." | tee -a "$LOG_FILE"
+while [ $COUNT -lt $MAX_RETRIES ]; do
+  POLL_RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
+    "https://$SN_INSTANCE/api/now/table/change_request/$SYS_ID")
 
-  COUNT=0
-  while [ $COUNT -lt $MAX_RETRIES ]; do
-    RESPONSE=$(curl --silent --user "$SN_USER:$SN_PASS" \
-      "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID")
+  CHANGE_STATE=$(echo "$POLL_RESPONSE" | grep -o '"state":"[^"]*' | cut -d':' -f2 | tr -d '"')
+  APPROVAL=$(echo "$POLL_RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
 
-    STATE=$(echo "$RESPONSE" | grep -o '"state":"[^"]*' | sed 's/"state":"//')
-    APPROVAL=$(echo "$RESPONSE" | grep -o '"approval":"[^"]*' | sed 's/"approval":"//')
+  echo "🔄 Current State: $CHANGE_STATE | Approval: $APPROVAL" | tee -a "$LOG_FILE"
 
-    case "$CURRENT_STAGE" in
-      "Assess" )    TARGET_STATE="-4" ;;
-      "Authorize" ) TARGET_STATE="-3" ;;
-      "Scheduled" ) TARGET_STATE="-2" ;;
-      "Implement" ) TARGET_STATE="-1" ;;
-    esac
-
-    if [[ "$STATE" == "$TARGET_STATE" ]]; then
-      echo "✅ Stage reached: $CURRENT_STAGE" | tee -a "$LOG_FILE"
-
-      # === Scheduled time setup ===
-      if [[ "$CURRENT_STAGE" == "Scheduled" ]]; then
-        IST_START=$(TZ=Asia/Kolkata date -d "+2 minutes" +"%Y-%m-%d %H:%M:%S")
-        IST_END=$(TZ=Asia/Kolkata date -d "+7 minutes" +"%Y-%m-%d %H:%M:%S")
-
-        START_UTC=$(TZ=Asia/Kolkata date -d "$IST_START" -u +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(TZ=Asia/Kolkata date -d "$IST_END" -u +"%Y-%m-%dT%H:%M:%SZ")
-
-        echo "📅 Setting dynamic schedule window:" | tee -a "$LOG_FILE"
-        echo "👉 IST Start: $IST_START" | tee -a "$LOG_FILE"
-        echo "👉 IST End  : $IST_END"   | tee -a "$LOG_FILE"
-        echo "👉 UTC Start: $START_UTC" | tee -a "$LOG_FILE"
-        echo "👉 UTC End  : $END_UTC"   | tee -a "$LOG_FILE"
-
-        curl --silent --request PATCH \
-          "https://$SN_INSTANCE/api/now/table/change_request/$CHANGE_REQUEST_ID" \
-          --user "$SN_USER:$SN_PASS" \
-          --header "Content-Type: application/json" \
-          --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
-
-        echo "⏳ Waiting for scheduled time to start: $START_UTC" | tee -a "$LOG_FILE"
-        while true; do
-          CURRENT_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          if [[ "$CURRENT_UTC" > "$START_UTC" || "$CURRENT_UTC" == "$START_UTC" ]]; then
-            echo "✅ Scheduled start time reached: $CURRENT_UTC" | tee -a "$LOG_FILE"
-            break
-          fi
-          echo "⏱ Still waiting... Current UTC: $CURRENT_UTC" | tee -a "$LOG_FILE"
-          sleep 10
-        done
-      fi
-
-      CURRENT_STAGE_INDEX=$((CURRENT_STAGE_INDEX + 1))
-      break
-    fi
-
-    if [[ "$STATE" < "$TARGET_STATE" ]]; then
-      echo "⏩ Stage $CURRENT_STAGE skipped automatically. Continuing..." | tee -a "$LOG_FILE"
-      CURRENT_STAGE_INDEX=$((CURRENT_STAGE_INDEX + 1))
-      break
-    fi
-
-    if [[ "$APPROVAL" == "rejected" ]]; then
-      echo "❌ Change Request Rejected during $CURRENT_STAGE. Exiting." | tee -a "$LOG_FILE"
-      exit 1
-    fi
-
-    echo "⏳ [$COUNT/$MAX_RETRIES] $CURRENT_STAGE not reached yet. Retrying in $SLEEP_INTERVAL sec..." | tee -a "$LOG_FILE"
-    sleep $SLEEP_INTERVAL
-    COUNT=$((COUNT + 1))
-  done
-
-  if [ $COUNT -ge $MAX_RETRIES ]; then
-    echo "❌ Timeout waiting for stage: $CURRENT_STAGE. Exiting." | tee -a "$LOG_FILE"
+  if [[ "$APPROVAL" == "rejected" ]]; then
+    echo "❌ Change Request Rejected. Exiting." | tee -a "$LOG_FILE"
     exit 1
   fi
+
+  if [[ "$CHANGE_STATE" == "-2" && "$SCHEDULED_SET" == "false" ]]; then
+    # Initial schedule setup
+    UTC_START=$(date -u -d "+3 minutes" +"%Y-%m-%d %H:%M:%S")
+    UTC_END=$(date -u -d "+35 minutes" +"%Y-%m-%d %H:%M:%S")
+
+    curl --silent --user "$SN_USER:$SN_PASS" -X PATCH \
+      "https://$SN_INSTANCE/api/now/table/change_request/$SYS_ID" \
+      -H "Content-Type: application/json" \
+      -d "{
+            \"start_date\": \"$UTC_START\",
+            \"end_date\": \"$UTC_END\"
+          }" > /dev/null
+
+    echo "🕒 Scheduled Start (UTC): $UTC_START" | tee -a "$LOG_FILE"
+    echo "🕒 Scheduled End   (UTC): $UTC_END" | tee -a "$LOG_FILE"
+
+    SCHEDULED_SET=true
+    WAITED_FOR_START=true
+  fi
+
+  if [[ "$CHANGE_STATE" == "-1" ]]; then
+    # Fetch latest start_date from ServiceNow
+    NEW_START_DATE_UTC=$(echo "$POLL_RESPONSE" | grep -o '"start_date":"[^"]*' | sed 's/"start_date":"//' | cut -d'"' -f1)
+
+    if [ -n "$NEW_START_DATE_UTC" ]; then
+      SCHEDULED_EPOCH=$(date -d "$NEW_START_DATE_UTC UTC" +%s)
+      NOW_EPOCH=$(date +%s)
+
+      if [ $SCHEDULED_EPOCH -gt $NOW_EPOCH ]; then
+        WAIT_DURATION=$(( SCHEDULED_EPOCH - NOW_EPOCH ))
+        echo "🕓 Updated Scheduled Start (UTC): $NEW_START_DATE_UTC" | tee -a "$LOG_FILE"
+        echo "⏳ Waiting $WAIT_DURATION seconds until scheduled time..." | tee -a "$LOG_FILE"
+        sleep $WAIT_DURATION
+      fi
+    fi
+
+    echo "🚀 Change Request is in 'Implement' state. Proceeding with deployment." | tee -a "$LOG_FILE"
+    break
+  fi
+
+  COUNT=$((COUNT + 1))
+  echo "⏳ Waiting... ($COUNT/$MAX_RETRIES)" | tee -a "$LOG_FILE"
+  sleep $SLEEP_INTERVAL
 done
 
-echo "✅ All stages completed: Assess → Authorize → Scheduled → Implement" | tee -a "$LOG_FILE"
+if [ $COUNT -ge $MAX_RETRIES ]; then
+  echo "❌ Timeout while monitoring Change Request stages." | tee -a "$LOG_FILE"
+  exit 1
+fi
+
+echo "✅ Change Request automation completed successfully." | tee -a "$LOG_FILE"
 exit 0
