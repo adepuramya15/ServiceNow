@@ -108,17 +108,17 @@ while [ $CURRENT_STAGE_INDEX -lt ${#STAGES[@]} ]; do
     if [[ "$STATE" == "$TARGET_STATE" ]]; then
       echo "✅ Stage reached: $CURRENT_STAGE" | tee -a "$LOG_FILE"
 
-      # === Handle Scheduled Time Setup ===
+      # === Scheduled time setup ===
       if [[ "$CURRENT_STAGE" == "Scheduled" ]]; then
-        IST_FIXED="2025-06-25 15:05:00"
-        END_FIXED="2025-06-25 15:10:00"
+        IST_START=$(TZ=Asia/Kolkata date -d "+2 minutes" +"%Y-%m-%d %H:%M:%S")
+        IST_END=$(TZ=Asia/Kolkata date -d "+7 minutes" +"%Y-%m-%d %H:%M:%S")
 
-        START_UTC=$(date -u -d "$IST_FIXED" +"%Y-%m-%dT%H:%M:%SZ")
-        END_UTC=$(date -u -d "$END_FIXED" +"%Y-%m-%dT%H:%M:%SZ")
+        START_UTC=$(TZ=Asia/Kolkata date -d "$IST_START" -u +"%Y-%m-%dT%H:%M:%SZ")
+        END_UTC=$(TZ=Asia/Kolkata date -d "$IST_END" -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        echo "📅 Setting fixed schedule window:" | tee -a "$LOG_FILE"
-        echo "👉 IST Start: $IST_FIXED" | tee -a "$LOG_FILE"
-        echo "👉 IST End  : $END_FIXED" | tee -a "$LOG_FILE"
+        echo "📅 Setting dynamic schedule window:" | tee -a "$LOG_FILE"
+        echo "👉 IST Start: $IST_START" | tee -a "$LOG_FILE"
+        echo "👉 IST End  : $IST_END"   | tee -a "$LOG_FILE"
         echo "👉 UTC Start: $START_UTC" | tee -a "$LOG_FILE"
         echo "👉 UTC End  : $END_UTC"   | tee -a "$LOG_FILE"
 
@@ -128,7 +128,7 @@ while [ $CURRENT_STAGE_INDEX -lt ${#STAGES[@]} ]; do
           --header "Content-Type: application/json" \
           --data "{ \"start_date\": \"$START_UTC\", \"end_date\": \"$END_UTC\" }" > /dev/null
 
-        echo "⏳ Waiting until: $START_UTC" | tee -a "$LOG_FILE"
+        echo "⏳ Waiting for scheduled time to start: $START_UTC" | tee -a "$LOG_FILE"
         while true; do
           CURRENT_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           if [[ "$CURRENT_UTC" > "$START_UTC" || "$CURRENT_UTC" == "$START_UTC" ]]; then
