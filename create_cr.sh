@@ -19,12 +19,16 @@ RISK="2"
 IMPACT="2"
 ASSIGNED_TO_SYS_ID="ed36e12b9782a61077bf3fdce053af01"
 
-# === Planning Fields ===
-JUSTIFICATION="Integrating Splunk logging into Harness CI/CD pipeline for enhanced monitoring and automated event visibility."
-IMPLEMENTATION_PLAN="1. Configure Splunk HEC endpoint\n2. Push logs from Harness CI pipeline\n3. Validate log ingestion\n4. Monitor dashboards and alerts"
-RISK_AND_IMPACT_ANALYSIS="Risk is minimal. If Splunk fails to receive logs, fallback logging remains active on Jenkins and Harness. No disruption expected."
-BACKOUT_PLAN="Revert to default Jenkins logging by disabling Splunk steps in the pipeline."
-TEST_PLAN="Trigger CI/CD job, verify that logs are received in Splunk index, and validate using search query."
+# === Planning Fields (Expanded to 2–3 lines each) ===
+JUSTIFICATION="We are integrating Splunk logging into the Harness CI/CD pipeline to enhance observability.\nThis ensures faster detection of failures, better compliance tracking, and improved deployment visibility."
+
+IMPLEMENTATION_PLAN="Step 1: Set up the Splunk HTTP Event Collector (HEC) endpoint.\nStep 2: Configure Harness CI pipeline to push logs to Splunk.\nStep 3: Trigger test builds and confirm logs are ingested.\nStep 4: Monitor ingestion in real-time using Splunk dashboards and set alerts."
+
+RISK_AND_IMPACT_ANALYSIS="Risk is minimal as default logging in Jenkins and Harness remains functional.\nIn case of Splunk failure, deployment logs are still captured locally.\nNo production disruption is expected due to this integration."
+
+BACKOUT_PLAN="Revert pipeline to exclude Splunk-related steps if any failure or issue is encountered.\nRestore previous stable CI/CD configuration by rolling back recent changes."
+
+TEST_PLAN="Run a sample CI/CD build to generate deployment events.\nVerify these logs appear in the target Splunk index using a defined search query.\nEnsure timestamps, format, and key fields match expectations."
 
 CAB_REQUIRED="true"
 CAB_DELEGATE="Change Advisory Board"
