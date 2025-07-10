@@ -1,6 +1,6 @@
 📦 Creating change request...
-✅ Change Request ID: 0503cc5f9722221077bf3fdce053af44
-📌 Change Request Number: CHG0030188
+✅ Change Request ID: fe20d81f9762221077bf3fdce053afe4
+📌 Change Request Number: CHG0030192
 🔄 Updating planning fields...
 🔄 Current State: -4 | Approval: requested
 ⏳ Waiting... (1/60)
@@ -8,10 +8,6 @@
 ⏳ Waiting... (2/60)
 🔄 Current State: -3 | Approval: requested
 ⏳ Waiting... (3/60)
-🔄 Current State: -3 | Approval: requested
-⏳ Waiting... (4/60)
-🔄 Current State: -3 | Approval: requested
-⏳ Waiting... (5/60)
 🔄 Current State: -1 | Approval: approved
 🚀 Change Request is in 'Implement' state. Proceeding with deployment.
 ✅ Change Request automation completed successfully.
