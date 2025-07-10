@@ -1,26 +1,27 @@
 📦 Creating change request...
-✅ Change Request ID: 1355eace975aa25077bf3fdce053afcf
-📌 Change Request Number: CHG0030174
+✅ Change Request ID: 1b2cbf479722221077bf3fdce053af12
+📌 Change Request Number: CHG0030186
 🔄 Updating planning fields...
-🔍 Waiting for stage: Assess...
-✅ Stage reached: Assess
-🔍 Waiting for stage: Authorize...
-⏳ [0/60] Authorize not reached yet. Retrying in 30 sec...
-⏳ [1/60] Authorize not reached yet. Retrying in 30 sec...
-⏳ [2/60] Authorize not reached yet. Retrying in 30 sec...
-⏳ [3/60] Authorize not reached yet. Retrying in 30 sec...
-⏳ [4/60] Authorize not reached yet. Retrying in 30 sec...
-⏳ [5/60] Authorize not reached yet. Retrying in 30 sec...
-✅ Stage reached: Authorize
-🔍 Waiting for stage: Scheduled...
-⏳ [0/60] Scheduled not reached yet. Retrying in 30 sec...
-✅ Stage reached: Scheduled
-📅 Setting schedule window:
-👉 UTC Start: 2025-06-24T10:25:31Z
-👉 UTC End  : 2025-06-24T05:26:31Z
-⏳ Waiting for UTC time to reach scheduled start time: 2025-06-24T10:25:31Z
-✅ Scheduled time reached: 2025-06-24T10:25:33Z
-🔍 Waiting for stage: Implement...
-⏳ [0/60] Implement not reached yet. Retrying in 30 sec...
-✅ Stage reached: Implement
-✅ All stages completed: Assess → Authorize → Scheduled → Implement
+🔄 Current State: -4 | Approval: requested
+⏳ Waiting... (1/60)
+🔄 Current State: -4 | Approval: requested
+⏳ Waiting... (2/60)
+🔄 Current State: -4 | Approval: requested
+⏳ Waiting... (3/60)
+🔄 Current State: -4 | Approval: requested
+⏳ Waiting... (4/60)
+🔄 Current State: -4 | Approval: requested
+⏳ Waiting... (5/60)
+🔄 Current State: -4 | Approval: requested
+⏳ Waiting... (6/60)
+🔄 Current State: -3 | Approval: requested
+⏳ Waiting... (7/60)
+🔄 Current State: -2 | Approval: approved
+🕒 Scheduled Start (UTC): 2025-07-10 05:37:24
+🕒 Scheduled End   (UTC): 2025-07-10 06:09:24
+⏳ Waiting... (8/60)
+🔄 Current State: -1 | Approval: approved
+🕓 Updated Scheduled Start (UTC): 2025-07-10 05:37:24
+⏳ Waiting 145 seconds until scheduled time...
+🚀 Change Request is in 'Implement' state. Proceeding with deployment.
+✅ Change Request automation completed successfully.

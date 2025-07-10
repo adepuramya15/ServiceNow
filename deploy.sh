@@ -1,8 +1,8 @@
 #!/bin/bash
  
 # Hardcoded Splunk HEC values
-SPLUNK_URL="https://prd-p-p4d4r.splunkcloud.com"
-HEC_TOKEN="666a93a7-b613-4272-8da8-d1662429936e"
+SPLUNK_URL="https://prd-p-lpdzf.splunkcloud.com"
+HEC_TOKEN="e20dfd26-400a-44ec-99d8-f0bab04ea955"
   
 # Specify the log file and source ltype directly here
 LOGFILE="logs/transaction.log"         # ✅ Change this to your desired log file
