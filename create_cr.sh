@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # === STEP 1: Variables ===
-SN_INSTANCE="dev299595.service-now.com"
+SN_INSTANCE="dev293821.service-now.com"
 SN_USER="admin"
-SN_PASS="iRN-lr6!5EnR"
+SN_PASS="N4kXM%bwcQ7*"
 LOG_FILE="./change_request.log"
 
 # === Change Request Fields ===
-ASSIGNMENT_GROUP="Software"
+ASSIGNMENT_GROUP="a715cd759f2002002920bde8132e7018"
 REASON="Automated change request for Splunk log integration using Harness CI/CD pipeline."
 REQUESTED_BY="David Loo"
 CATEGORY="Software"
@@ -17,7 +17,7 @@ CONFIG_ITEM="IT Services"
 PRIORITY="3"
 RISK="2"
 IMPACT="2"
-ASSIGNED_TO_SYS_ID="ed36e12b9782a61077bf3fdce053af01"
+ASSIGNED_TO_SYS_ID="RAMYA ADEPU"
 
 # === Planning Fields (Expanded to 2–3 lines each) ===
 JUSTIFICATION="We are integrating Splunk logging into the Harness CI/CD pipeline to enhance observability.\nThis ensures faster detection of failures, better compliance tracking, and improved deployment visibility."

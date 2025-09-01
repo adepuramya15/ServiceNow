@@ -1,12 +1,12 @@
 #!/bin/bash
  
 # Hardcoded Splunk HEC values
-SPLUNK_URL="https://prd-p-lpdzf.splunkcloud.com"
-HEC_TOKEN="e20dfd26-400a-44ec-99d8-f0bab04ea955"
+SPLUNK_URL="https://prd-p-idagf.splunkcloud.com"
+HEC_TOKEN="6e0ba98d-a308-4e56-bf0f-2bccb7b803ab"
   
 # Specify the log file and source ltype directly here
 LOGFILE="logs/transaction.log"         # ✅ Change this to your desired log file
-SOURCETYPE="Omsairam"               # ✅ Change this to your desired source type
+SOURCETYPE="today91"               # ✅ Change this to your desired source type
 INDEX="my_harness_index"     # ✅ Change this to your desired index
  
 # Debug info

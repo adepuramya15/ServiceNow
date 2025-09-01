@@ -1,6 +1,6 @@
 📦 Creating change request...
-✅ Change Request ID: fe20d81f9762221077bf3fdce053afe4
-📌 Change Request Number: CHG0030192
+✅ Change Request ID: ec5d39d08377221095b9bf10feaad335
+📌 Change Request Number: CHG0030018
 🔄 Updating planning fields...
 🔄 Current State: -4 | Approval: requested
 ⏳ Waiting... (1/60)
@@ -8,6 +8,16 @@
 ⏳ Waiting... (2/60)
 🔄 Current State: -3 | Approval: requested
 ⏳ Waiting... (3/60)
+🔄 Current State: -3 | Approval: requested
+⏳ Waiting... (4/60)
+🔄 Current State: -2 | Approval: approved
+🕒 Scheduled Start (UTC): 2025-09-01 10:36:42
+🕒 Scheduled End   (UTC): 2025-09-01 11:08:43
+⏳ Waiting... (5/60)
+🔄 Current State: -2 | Approval: approved
+⏳ Waiting... (6/60)
 🔄 Current State: -1 | Approval: approved
+🕓 Updated Scheduled Start (UTC): 2025-09-01 10:36:42
+⏳ Waiting 113 seconds until scheduled time...
 🚀 Change Request is in 'Implement' state. Proceeding with deployment.
 ✅ Change Request automation completed successfully.
