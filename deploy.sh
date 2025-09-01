@@ -2,7 +2,7 @@
  
 # Hardcoded Splunk HEC values
 SPLUNK_URL="https://prd-p-idagf.splunkcloud.com"
-HEC_TOKEN="6e0ba98d-a308-4e56-bf0f-2bccb7b803ab"
+HEC_TOKEN="18e2d830-de74-404b-a4ab-3e7f21940638"
   
 # Specify the log file and source ltype directly here
 LOGFILE="logs/transaction.log"         # ✅ Change this to your desired log file
