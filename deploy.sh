@@ -20,7 +20,7 @@ if [[ -f "$LOGFILE" ]]; then
   echo "📤 Sending $LOGFILE to Splunk..."
   while IFS= read -r line; do
     curl --silent --output /dev/null \
-      -k "$SPLUNK_URL:8088/services/collector" \
+      -k "$SPLUNK_URL/services/collector" \
       -H "Authorization: Splunk $HEC_TOKEN" \
       -H "Content-Type: application/json" \
       -d "{\"event\": \"$line\", \"sourcetype\": \"$SOURCETYPE\", \"index\": \"$INDEX\"}" \
