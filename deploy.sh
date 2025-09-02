@@ -5,8 +5,8 @@ SPLUNK_URL="https://prd-p-idagf.splunkcloud.com"
 HEC_TOKEN="18e2d830-de74-404b-a4ab-3e7f21940638"
   
 # Specify the log file and source ltype directly here
-LOGFILE="logs/app.log"         # ✅ Change this to your desired log file
-SOURCETYPE="today91"               # ✅ Change this to your desired source type
+LOGFILE="logs/application.log"         # ✅ Change this to your desired log file
+SOURCETYPE="application_logs"               # ✅ Change this to your desired source type
 INDEX="my_harness_index"     # ✅ Change this to your desired index
  
 # Debug info
