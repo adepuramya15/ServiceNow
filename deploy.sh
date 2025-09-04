@@ -33,4 +33,4 @@ fi
  
 echo "✅ Deployment finished!"
 
-#hello team
+#hello
